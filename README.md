@@ -29,11 +29,3 @@ docker compose up --build
 Gateway: `http://localhost:4000`  
 Frontend: `http://localhost:3001`
 
-## Documentation
-
-- [Team Quick Start](C:\Users\nimes\OneDrive\Documents\7 th semester\EC7204 Cloud computing\Project\docs\team-quickstart.md)
-- [Microservice Architecture](C:\Users\nimes\OneDrive\Documents\7 th semester\EC7204 Cloud computing\Project\docs\microservice-architecture.md)
-- [Step 01 Architecture](C:\Users\nimes\OneDrive\Documents\7 th semester\EC7204 Cloud computing\Project\docs\step01-scope-and-architecture.md)
-- [Step 03 Database and Contracts](C:\Users\nimes\OneDrive\Documents\7 th semester\EC7204 Cloud computing\Project\docs\step03-database-and-contracts.md)
-- [Step 04 Service Implementation](C:\Users\nimes\OneDrive\Documents\7 th semester\EC7204 Cloud computing\Project\docs\step04-service-implementation.md)
-- [Team Implementation Guide](C:\Users\nimes\OneDrive\Documents\7 th semester\EC7204 Cloud computing\Project\docs\team-implementation-guide.md)
