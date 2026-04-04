@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SecureStay</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="bg-shape bg-shape-a"></div>
+  <div class="bg-shape bg-shape-b"></div>
+  <header class="hero">
+    <h1>SecureStay</h1>
+    <p>Simple, secure hotel booking in one flow.</p>
+    <div class="hero-meta">
+      <span id="authState">Not logged in</span>
+      <button id="logoutBtn" class="ghost-btn" type="button">Log Out</button>
+    </div>
+  </header>
+
+  <main class="grid">
+    <section class="card">
+      <h2>1. Register</h2>
+      <form id="registerForm">
+        <label>Full Name <input name="fullName" required /></label>
+        <label>Email <input name="email" type="email" required /></label>
+        <label>Password <input name="password" type="password" minlength="8" required /></label>
+        <button type="submit">Create Account</button>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2>2. Login</h2>
+      <form id="loginForm">
+        <label>Email <input name="email" type="email" required /></label>
+        <label>Password <input name="password" type="password" required /></label>
+        <button type="submit">Login</button>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2>3. Browse Hotels</h2>
+      <button id="loadHotelsBtn" type="button">Load Hotels</button>
+      <label>Hotels
+        <select id="hotelSelect"></select>
+      </label>
+      <button id="loadRoomsBtn" type="button">Load Rooms</button>
+      <label>Rooms
+        <select id="roomSelect"></select>
+      </label>
+    </section>
+
+    <section class="card">
+      <h2>4. Availability</h2>
+      <form id="availabilityForm">
+        <label>Check-in <input name="checkInDate" type="date" required /></label>
+        <label>Check-out <input name="checkOutDate" type="date" required /></label>
+        <button type="submit">Check Availability</button>
+      </form>
+      <p id="availabilityText">No check performed yet.</p>
+    </section>
+
+    <section class="card">
+      <h2>5. Create Booking</h2>
+      <form id="bookingForm">
+        <label>Guest Count <input name="guestCount" type="number" min="1" value="1" required /></label>
+        <button type="submit">Create Booking</button>
+      </form>
+      <p id="bookingText">No booking yet.</p>
+    </section>
+
+    <section class="card">
+      <h2>6. Pay</h2>
+      <form id="paymentForm">
+        <label>Card Number <input name="cardNumber" value="4111111111111111" required /></label>
+        <label>Card Holder <input name="cardHolderName" value="Demo User" required /></label>
+        <label>Expiry Month <input name="expiryMonth" type="number" min="1" max="12" value="12" required /></label>
+        <label>Expiry Year <input name="expiryYear" type="number" min="2026" value="2030" required /></label>
+        <label>CVV (use 000 to fail) <input name="cvv" value="123" required /></label>
+        <button type="submit">Submit Payment</button>
+      </form>
+      <p id="paymentText">No payment yet.</p>
+    </section>
+  </main>
+
+  <aside class="log-card">
+    <h3>Activity</h3>
+    <pre id="logBox"></pre>
+  </aside>
+
+  <script src="./app.js"></script>
+</body>
+</html>

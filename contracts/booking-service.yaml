@@ -1,0 +1,217 @@
+openapi: 3.0.3
+info:
+  title: SecureStay Booking Service API
+  version: 1.0.0
+  description: Contract for hotel browsing, room listing, and booking creation.
+servers:
+  - url: /api/bookings
+paths:
+  /hotels:
+    get:
+      summary: List hotels, optionally filtered by city
+      parameters:
+        - in: query
+          name: city
+          schema:
+            type: string
+          description: City name filter
+      responses:
+        '200':
+          description: Hotel list returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Hotel'
+  /rooms:
+    get:
+      summary: List rooms for a given hotel
+      parameters:
+        - in: query
+          name: hotelId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Rooms returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Room'
+        '400':
+          description: Missing hotelId
+  /availability:
+    get:
+      summary: Check room availability for a date range
+      parameters:
+        - in: query
+          name: roomId
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: checkInDate
+          required: true
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: checkOutDate
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Availability result returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AvailabilityResponse'
+  /:
+    post:
+      summary: Create a booking
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBookingRequest'
+      responses:
+        '201':
+          description: Booking created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+        '400':
+          description: Validation error
+        '401':
+          description: Missing or invalid token
+  /{bookingId}:
+    get:
+      summary: Get a booking by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: bookingId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Booking returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+        '404':
+          description: Booking not found
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Hotel:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        city:
+          type: string
+        address:
+          type: string
+        description:
+          type: string
+    Room:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        hotelId:
+          type: string
+          format: uuid
+        roomNumber:
+          type: string
+        roomType:
+          type: string
+        pricePerNight:
+          type: number
+          format: double
+        capacity:
+          type: integer
+        isActive:
+          type: boolean
+    CreateBookingRequest:
+      type: object
+      required:
+        - roomId
+        - checkInDate
+        - checkOutDate
+        - guestCount
+      properties:
+        roomId:
+          type: string
+          format: uuid
+        checkInDate:
+          type: string
+          format: date
+        checkOutDate:
+          type: string
+          format: date
+        guestCount:
+          type: integer
+          minimum: 1
+    Booking:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        roomId:
+          type: string
+          format: uuid
+        checkInDate:
+          type: string
+          format: date
+        checkOutDate:
+          type: string
+          format: date
+        totalAmount:
+          type: number
+          format: double
+        status:
+          type: string
+          example: PENDING
+        guestCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+    AvailabilityResponse:
+      type: object
+      properties:
+        roomId:
+          type: string
+          format: uuid
+        available:
+          type: boolean
