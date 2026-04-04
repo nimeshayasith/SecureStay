@@ -1,0 +1,126 @@
+openapi: 3.0.3
+info:
+  title: SecureStay Payment Service API
+  version: 1.0.0
+  description: Contract for secure payment submission and status lookup.
+servers:
+  - url: /api/payments
+paths:
+  /:
+    post:
+      summary: Submit a payment for a booking
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePaymentRequest'
+      responses:
+        '201':
+          description: Payment recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+        '400':
+          description: Validation error
+        '401':
+          description: Missing or invalid token
+        '404':
+          description: Booking not found
+  /{paymentId}:
+    get:
+      summary: Get a payment by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: paymentId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Payment returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+        '404':
+          description: Payment not found
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    CreatePaymentRequest:
+      type: object
+      required:
+        - bookingId
+        - amount
+        - paymentMethod
+        - cardNumber
+        - cardHolderName
+        - expiryMonth
+        - expiryYear
+        - cvv
+      properties:
+        bookingId:
+          type: string
+          format: uuid
+        amount:
+          type: number
+          format: double
+        paymentMethod:
+          type: string
+          example: CARD
+        cardNumber:
+          type: string
+          minLength: 12
+          maxLength: 19
+        cardHolderName:
+          type: string
+        expiryMonth:
+          type: integer
+          minimum: 1
+          maximum: 12
+        expiryYear:
+          type: integer
+          minimum: 2026
+        cvv:
+          type: string
+          minLength: 3
+          maxLength: 4
+    Payment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        bookingId:
+          type: string
+          format: uuid
+        amount:
+          type: number
+          format: double
+        currency:
+          type: string
+          example: USD
+        paymentMethod:
+          type: string
+        transactionReference:
+          type: string
+        status:
+          type: string
+          example: SUCCESS
+        maskedCardNumber:
+          type: string
+          example: "************1234"
+        processedAt:
+          type: string
+          format: date-time
