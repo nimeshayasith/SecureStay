@@ -2,5 +2,8 @@ node_modules/
 .env
 *.log
 .DS_Store
+<<<<<<< HEAD
 k8s/kubectl
 k8s/minikube-linux-amd64
+=======
+>>>>>>> 79de00c96b73598f7ad312ea3e3ce77cd3c7249d

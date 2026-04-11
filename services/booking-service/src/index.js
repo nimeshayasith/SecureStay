@@ -10,12 +10,17 @@ const port = Number(process.env.PORT || 4002);
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const jwtSecret = process.env.JWT_SECRET || "securestay-dev-secret";
 
+<<<<<<< HEAD
 const rabbitmqUrl = process.env.RABBITMQ_URL || "amqp://rabbitmq.default.svc.cluster.local:5672";
+=======
+const rabbitmqUrl = process.env.RABBITMQ_URL || "amqp://localhost:5672";
+>>>>>>> 79de00c96b73598f7ad312ea3e3ce77cd3c7249d
 const bookingEventsExchange = process.env.BOOKING_EVENTS_EXCHANGE || "securestay.events";
 let eventChannel;
 
 app.use(express.json());
 
+<<<<<<< HEAD
 async function initRabbitMq(retries = 10) {
   while (retries > 0) {
     try {
@@ -36,10 +41,22 @@ async function initRabbitMq(retries = 10) {
   }
 
   console.error("RabbitMQ connection failed permanently");
+=======
+async function initRabbitMq() {
+  try {
+    const connection = await amqp.connect(rabbitmqUrl);
+    eventChannel = await connection.createChannel();
+    await eventChannel.assertExchange(bookingEventsExchange, "topic", { durable: true });
+    console.log("Booking service connected to RabbitMQ");
+  } catch (error) {
+    console.error("Booking service RabbitMQ init failed", error.message);
+  }
+>>>>>>> 79de00c96b73598f7ad312ea3e3ce77cd3c7249d
 }
 
 async function publishEvent(routingKey, payload) {
   if (!eventChannel) {
+<<<<<<< HEAD
     console.error("❌ RabbitMQ channel not ready. Event dropped:", routingKey);
     return;
   }
@@ -56,6 +73,17 @@ async function publishEvent(routingKey, payload) {
   } catch (err) {
     console.error("❌ Failed to publish event:", err.message);
   }
+=======
+    return;
+  }
+
+  eventChannel.publish(
+    bookingEventsExchange,
+    routingKey,
+    Buffer.from(JSON.stringify(payload)),
+    { contentType: "application/json", persistent: true }
+  );
+>>>>>>> 79de00c96b73598f7ad312ea3e3ce77cd3c7249d
 }
 
 function authMiddleware(req, res, next) {
@@ -188,7 +216,11 @@ app.get("/api/bookings/availability", async (req, res) => {
   }
 });
 
+<<<<<<< HEAD
 app.post("/api/bookings/", async (req, res) => {
+=======
+app.post("/api/bookings/", authMiddleware, async (req, res) => {
+>>>>>>> 79de00c96b73598f7ad312ea3e3ce77cd3c7249d
   const { roomId, checkInDate, checkOutDate, guestCount } = req.body || {};
 
   if (!roomId || !checkInDate || !checkOutDate || !guestCount || Number(guestCount) < 1) {
@@ -330,6 +362,7 @@ app.patch("/internal/bookings/:bookingId/status", async (req, res) => {
   }
 });
 
+<<<<<<< HEAD
 async function startService() {
   await initRabbitMq();
 
@@ -339,3 +372,10 @@ async function startService() {
 }
 
 startService();
+=======
+initRabbitMq().then(() => {
+  app.listen(port, () => {
+    console.log(`Booking service listening on port ${port}`);
+  });
+});
+>>>>>>> 79de00c96b73598f7ad312ea3e3ce77cd3c7249d

@@ -1,4 +1,5 @@
 require("dotenv").config();
+<<<<<<< HEAD
 const express = require("express");
 const amqp = require("amqplib");
 const { MongoClient } = require("mongodb");
@@ -7,10 +8,21 @@ const app = express();
 const port = Number(process.env.PORT || 4004);
 const rabbitmqUrl = process.env.RABBITMQ_URL || "amqp://rabbitmq.default.svc.cluster.local:5672";
 const mongoUrl = process.env.MONGODB_URL || "mongodb://localhost:27017";
+=======
+
+const express = require("express");
+const amqp = require("amqplib");
+
+const app = express();
+const port = Number(process.env.PORT || 4004);
+
+const rabbitmqUrl = process.env.RABBITMQ_URL || "amqp://localhost:5672";
+>>>>>>> 79de00c96b73598f7ad312ea3e3ce77cd3c7249d
 const eventsExchange = process.env.EVENTS_EXCHANGE || "securestay.events";
 const notificationQueue = process.env.NOTIFICATION_QUEUE || "securestay.notifications";
 
 const notifications = [];
+<<<<<<< HEAD
 let db;
 
 // ✅ NEW — connect to MongoDB
@@ -24,6 +36,8 @@ async function initMongo() {
     console.error("MongoDB connection failed", error.message);
   }
 }
+=======
+>>>>>>> 79de00c96b73598f7ad312ea3e3ce77cd3c7249d
 
 app.get("/health", (_req, res) => {
   res.status(200).json({ status: "ok", service: "notification-service" });
@@ -33,6 +47,7 @@ app.get("/notifications", (_req, res) => {
   res.status(200).json(notifications.slice(-50));
 });
 
+<<<<<<< HEAD
 // ✅ NEW — get logs from MongoDB
 app.get("/notifications/logs", async (_req, res) => {
   try {
@@ -43,10 +58,13 @@ app.get("/notifications/logs", async (_req, res) => {
   }
 });
 
+=======
+>>>>>>> 79de00c96b73598f7ad312ea3e3ce77cd3c7249d
 async function startConsumer() {
   try {
     const connection = await amqp.connect(rabbitmqUrl);
     const channel = await connection.createChannel();
+<<<<<<< HEAD
     await channel.assertExchange(eventsExchange, "topic", { durable: true });
     await channel.assertQueue(notificationQueue, { durable: true });
     await channel.bindQueue(notificationQueue, eventsExchange, "booking.*");
@@ -54,6 +72,20 @@ async function startConsumer() {
 
     channel.consume(notificationQueue, async (message) => {
       if (!message) return;
+=======
+
+    await channel.assertExchange(eventsExchange, "topic", { durable: true });
+    await channel.assertQueue(notificationQueue, { durable: true });
+
+    await channel.bindQueue(notificationQueue, eventsExchange, "booking.*");
+    await channel.bindQueue(notificationQueue, eventsExchange, "payment.*");
+
+    channel.consume(notificationQueue, (message) => {
+      if (!message) {
+        return;
+      }
+
+>>>>>>> 79de00c96b73598f7ad312ea3e3ce77cd3c7249d
       try {
         const payload = JSON.parse(message.content.toString("utf8"));
         const logEntry = {
@@ -62,6 +94,7 @@ async function startConsumer() {
           receivedAt: new Date().toISOString()
         };
 
+<<<<<<< HEAD
         // keep in memory (existing)
         notifications.push(logEntry);
         console.log("Notification event consumed", logEntry.routingKey, logEntry.payload.eventType);
@@ -71,6 +104,10 @@ async function startConsumer() {
           await db.collection("notification_logs").insertOne(logEntry);
         }
 
+=======
+        notifications.push(logEntry);
+        console.log("Notification event consumed", logEntry.routingKey, logEntry.payload.eventType);
+>>>>>>> 79de00c96b73598f7ad312ea3e3ce77cd3c7249d
         channel.ack(message);
       } catch (error) {
         console.error("Failed to consume notification message", error);
@@ -84,10 +121,16 @@ async function startConsumer() {
   }
 }
 
+<<<<<<< HEAD
 // ✅ init MongoDB first, then start server
 initMongo().then(() => {
   app.listen(port, () => {
     console.log(`Notification service listening on port ${port}`);
     startConsumer();
   });
+=======
+app.listen(port, () => {
+  console.log(`Notification service listening on port ${port}`);
+  startConsumer();
+>>>>>>> 79de00c96b73598f7ad312ea3e3ce77cd3c7249d
 });
