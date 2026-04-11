@@ -8,10 +8,8 @@
   },
   "dependencies": {
     "cors": "^2.8.5",
-<<<<<<< HEAD
+
     "dotenv": "^17.4.1",
-=======
->>>>>>> 79de00c96b73598f7ad312ea3e3ce77cd3c7249d
     "express": "^4.19.2",
     "http-proxy-middleware": "^3.0.0",
     "morgan": "^1.10.0"

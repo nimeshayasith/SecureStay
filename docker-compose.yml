@@ -6,11 +6,7 @@ services:
       POSTGRES_USER: securestay
       POSTGRES_PASSWORD: securestay
     ports:
-<<<<<<< HEAD
       - "5433:5432"
-=======
-      - "5432:5432"
->>>>>>> 79de00c96b73598f7ad312ea3e3ce77cd3c7249d
     volumes:
       - pg_data:/var/lib/postgresql/data
       - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
@@ -19,8 +15,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 15
-<<<<<<< HEAD
-      
+
   mongodb:
     image: mongo:7
     ports:
@@ -32,14 +27,12 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-=======
->>>>>>> 79de00c96b73598f7ad312ea3e3ce77cd3c7249d
 
   rabbitmq:
     image: rabbitmq:3-management-alpine
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - "5673:5672"
+      - "15673:15672"
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
       interval: 10s
@@ -112,7 +105,4 @@ services:
 
 volumes:
   pg_data:
-<<<<<<< HEAD
   mongo_data:
-=======
->>>>>>> 79de00c96b73598f7ad312ea3e3ce77cd3c7249d
