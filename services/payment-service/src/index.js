@@ -12,7 +12,7 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const jwtSecret = process.env.JWT_SECRET || "securestay-dev-secret";
 const bookingServiceInternalUrl = process.env.BOOKING_SERVICE_INTERNAL_URL || "http://localhost:4002";
 
-const rabbitmqUrl = process.env.RABBITMQ_URL || "amqp://localhost:5672";
+const rabbitmqUrl = process.env.RABBITMQ_URL || "amqp://rabbitmq.default.svc.cluster.local:5672";
 const paymentEventsExchange = process.env.PAYMENT_EVENTS_EXCHANGE || "securestay.events";
 let eventChannel;
 
