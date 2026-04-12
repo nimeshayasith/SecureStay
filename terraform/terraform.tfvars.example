@@ -1,0 +1,32 @@
+# Copy this file to terraform.tfvars and fill in your values.
+# Never commit terraform.tfvars to version control.
+
+aws_region   = "us-east-1"
+project_name = "securestay"
+environment  = "dev"
+
+# ─── EC2 ──────────────────────────────────────────────────────────────────────
+
+instance_type = "t2.micro" # Free Tier eligible
+
+# Name of an existing EC2 key pair in your AWS account (optional).
+# Leave empty to use SSM Session Manager for access (no key needed).
+key_name = ""
+
+# Your GitHub repository URL (must be publicly accessible, or use SSH URL + deploy key).
+repo_url = "https://github.com/YOUR_USERNAME/SecureStay.git"
+
+# Restrict SSH to your own IP for security: e.g. "203.0.113.10/32"
+allowed_ssh_cidr = "0.0.0.0/0"
+
+# ─── RDS ──────────────────────────────────────────────────────────────────────
+
+db_instance_class    = "db.t3.micro" # Free Tier eligible
+db_name              = "securestay"
+db_username          = "securestay"
+db_password          = "CHANGE_ME_strong_password_123!" # min 8 chars
+db_allocated_storage = 20 # Free Tier max is 20 GB
+
+# ─── Application ──────────────────────────────────────────────────────────────
+
+jwt_secret = "CHANGE_ME_use_a_long_random_string_here"
