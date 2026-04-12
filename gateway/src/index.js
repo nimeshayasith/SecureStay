@@ -8,7 +8,7 @@ const morgan = require("morgan");
 const { createProxyMiddleware } = require("http-proxy-middleware");
 
 const app = express();
-const port = Number(process.env.PORT || 4000;
+const port = Number(process.env.PORT || 4000);
 
 
 app.set("trust proxy", true);
