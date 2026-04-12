@@ -1,0 +1,65 @@
+name: SecureStay CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - "*"
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout code
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # 2. Set up Docker
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # 3. Login to Docker Hub
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      # 4. Build & Push Auth Service
+      - name: Build & Push Auth Service
+        uses: docker/build-push-action@v5
+        with:
+          context: ./services/auth-service
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/securestay-auth:latest
+
+      # 5. Build & Push Booking Service
+      - name: Build & Push Booking Service
+        uses: docker/build-push-action@v5
+        with:
+          context: ./services/booking-service
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/securestay-booking:latest
+
+      # 6. Build & Push Payment Service
+      - name: Build & Push Payment Service
+        uses: docker/build-push-action@v5
+        with:
+          context: ./services/payment-service
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/securestay-payment:latest
+
+      # 7. Build & Push Notification Service
+      - name: Build & Push Notification Service
+        uses: docker/build-push-action@v5
+        with:
+          context: ./services/notification-service
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/securestay-notification:latest
+
+
+      # 8. Kubernetes deploy stage
+
+      - name: Deploy to Kubernetes
+        run: |
+          echo "Here you will run kubectl apply -f k8s/"
