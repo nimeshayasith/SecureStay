@@ -3,7 +3,8 @@ name: SecureStay AWS CI/CD Pipeline
 on:
   push:
     branches:
-      - main   # change if you deploy from another branch
+      - main 
+      - dayani  # change if you deploy from another branch
 
 env:
   AWS_REGION: us-east-1
