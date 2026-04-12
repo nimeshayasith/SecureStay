@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(powershell -Command \"aws iam attach-user-policy --user-name terraform-user --policy-arn arn:aws:iam::aws:policy/AdministratorAccess 2>&1\")",
+      "Bash(terraform plan:*)",
+      "Bash(terraform apply:*)",
+      "Bash(powershell -Command \"aws ec2 describe-instance-types --region us-east-1 --filters 'Name=free-tier-eligible,Values=true' --query 'InstanceTypes[*].InstanceType' --output text 2>&1\")"
+    ]
+  }
+}
