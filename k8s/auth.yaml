@@ -32,4 +32,4 @@ spec:
             - name: PORT
               value: "4001"
             - name: DATABASE_URL
-              value: postgresql://securestay:securestay@postgres:5432/securesta
+              value: postgresql://securestay:securestay@postgres:5432/securestay
