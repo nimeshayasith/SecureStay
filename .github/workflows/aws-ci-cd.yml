@@ -4,7 +4,8 @@ on:
   push:
     branches:
       - main 
-      - dayani  # change if you deploy from another branch
+      - dayani
+      - Development  # change if you deploy from another branch
 
 env:
   AWS_REGION: us-east-1
