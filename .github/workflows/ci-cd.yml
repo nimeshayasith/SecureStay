@@ -3,7 +3,8 @@ name: SecureStay CI/CD Pipeline
 on:
   push:
     branches:
-      - "*"
+      - main
+      - dayani
 
 jobs:
   build-and-push:
