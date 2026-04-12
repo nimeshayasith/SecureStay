@@ -65,7 +65,7 @@ resource "aws_security_group" "ec2" {
 
 resource "aws_security_group" "rds" {
   name        = "${local.name_prefix}-rds-sg"
-  description = "Security group for RDS PostgreSQL — only EC2 may connect"
+  description = "Security group for RDS PostgreSQL - only EC2 may connect"
   vpc_id      = aws_vpc.main.id
 
   # PostgreSQL — only from the application EC2 instance

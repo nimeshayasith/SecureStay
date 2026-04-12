@@ -27,9 +27,8 @@ resource "aws_db_instance" "postgres" {
   db_subnet_group_name   = aws_db_subnet_group.main.name
   vpc_security_group_ids = [aws_security_group.rds.id]
 
-  # Free Tier: up to 7 days automated backup retention
-  backup_retention_period = 7
-  backup_window           = "03:00-04:00"
+  # Free tier accounts restrict automated backups; 0 disables them for dev
+  backup_retention_period = 0
   maintenance_window      = "Mon:04:00-Mon:05:00"
 
   # Prevent accidental deletion — set to false for dev/test environments

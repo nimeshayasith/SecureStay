@@ -33,9 +33,9 @@ variable "allowed_ssh_cidr" {
 # ─── EC2 ──────────────────────────────────────────────────────────────────────
 
 variable "instance_type" {
-  description = "EC2 instance type. t2.micro is AWS Free Tier eligible."
+  description = "EC2 instance type. t3.micro is AWS Free Tier eligible."
   type        = string
-  default     = "t2.micro"
+  default     = "t3.micro"
 }
 
 variable "key_name" {
@@ -45,9 +45,22 @@ variable "key_name" {
 }
 
 variable "repo_url" {
-  description = "Git repository URL to clone onto the EC2 instance. Must be publicly accessible or use SSH key."
+  description = "Git repository URL to clone onto the EC2 instance."
   type        = string
-  default     = "https://github.com/YOUR_USERNAME/SecureStay.git"
+  default     = "https://github.com/nimeshayasith/SecureStay.git"
+}
+
+variable "repo_branch" {
+  description = "Git branch to clone."
+  type        = string
+  default     = "kaveesha"
+}
+
+variable "github_token" {
+  description = "GitHub Personal Access Token for cloning a private repo. Create one at: GitHub → Settings → Developer settings → Personal access tokens → Fine-grained → Contents: Read-only."
+  type        = string
+  sensitive   = true
+  default     = ""
 }
 
 # ─── RDS ──────────────────────────────────────────────────────────────────────

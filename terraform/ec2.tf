@@ -33,20 +33,21 @@ resource "aws_instance" "app" {
 
   # Bootstrap script — installs Docker, clones repo, connects to RDS
   user_data = templatefile("${path.module}/scripts/user-data.sh", {
-    db_host     = aws_db_instance.postgres.address
-    db_user     = var.db_username
-    db_password = var.db_password
-    db_name     = var.db_name
-    repo_url    = var.repo_url
-    jwt_secret  = var.jwt_secret
+    db_host      = aws_db_instance.postgres.address
+    db_user      = var.db_username
+    db_password  = var.db_password
+    db_name      = var.db_name
+    repo_url     = var.repo_url
+    repo_branch  = var.repo_branch
+    github_token = var.github_token
+    jwt_secret   = var.jwt_secret
   })
 
   # Root volume — 8 GB is enough for Docker images on Free Tier
   root_block_device {
     volume_type           = "gp3"
-    volume_size           = 20
+    volume_size           = 30
     delete_on_termination = true
-    encrypted             = true
   }
 
   # Wait for RDS to be created first so user-data can connect

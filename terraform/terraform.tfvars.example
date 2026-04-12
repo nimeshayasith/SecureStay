@@ -13,8 +13,14 @@ instance_type = "t2.micro" # Free Tier eligible
 # Leave empty to use SSM Session Manager for access (no key needed).
 key_name = ""
 
-# Your GitHub repository URL (must be publicly accessible, or use SSH URL + deploy key).
-repo_url = "https://github.com/YOUR_USERNAME/SecureStay.git"
+# Your GitHub repository URL.
+repo_url    = "https://github.com/nimeshayasith/SecureStay.git"
+repo_branch = "kaveesha"
+
+# GitHub Personal Access Token — required for private repos.
+# Create at: GitHub → Settings → Developer settings → Personal access tokens
+# → Fine-grained → Repository: SecureStay → Contents: Read-only
+github_token = "github_pat_XXXX"
 
 # Restrict SSH to your own IP for security: e.g. "203.0.113.10/32"
 allowed_ssh_cidr = "0.0.0.0/0"
