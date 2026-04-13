@@ -53,6 +53,18 @@ app.use(
   )
 );
 
+/* ================= BLOCK INTERNAL ROUTES =================
+   Internal routes are for service-to-service communication only.
+   They must never be accessible through the public gateway.
+*/
+app.use("/api/bookings/internal", (_req, res) => {
+  res.status(404).json({ message: "Route not found" });
+});
+
+app.use("/api/payments/internal", (_req, res) => {
+  res.status(404).json({ message: "Route not found" });
+});
+
 /* ================= BOOKINGS ================
    Booking service routes: /api/bookings/hotels  /api/bookings/rooms  etc.
    Gateway receives:        /api/bookings/hotels
