@@ -1,0 +1,41 @@
+# AWS deployment override — used automatically by the EC2 bootstrap script.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.aws.yml up -d --build
+#
+# What this file does:
+#   1. Replaces the local postgres container with a lightweight dummy
+#      so that service health-check dependencies still resolve,
+#      while the real database runs on AWS RDS.
+#   2. Overrides DATABASE_URL in each service to point at RDS.
+#      The EC2 bootstrap script (terraform/scripts/user-data.sh) fills
+#      in the actual RDS endpoint via sed before starting Docker Compose.
+#
+# DO NOT run this file locally — it is only for AWS deployments.
+
+services:
+  # Lightweight dummy — satisfies `depends_on: postgres: condition: service_healthy`
+  # without running a real PostgreSQL instance.
+  postgres:
+    image: alpine:3.18
+    command: ["tail", "-f", "/dev/null"]
+    healthcheck:
+      test: ["CMD", "true"]
+      interval: 2s
+      timeout: 2s
+      retries: 1
+      start_period: 1s
+
+  # ── Services that need an updated DATABASE_URL ────────────────────────────
+  # The placeholders below are replaced by the EC2 bootstrap script.
+
+  auth-service:
+    environment:
+      DATABASE_URL: "postgresql://DB_USER:DB_PASS@DB_HOST:5432/DB_NAME"
+      JWT_SECRET: "JWT_SECRET_PLACEHOLDER"
+
+  booking-service:
+    environment:
+      DATABASE_URL: "postgresql://DB_USER:DB_PASS@DB_HOST:5432/DB_NAME"
+
+  payment-service:
+    environment:
+      DATABASE_URL: "postgresql://DB_USER:DB_PASS@DB_HOST:5432/DB_NAME"
