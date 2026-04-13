@@ -188,7 +188,7 @@ app.get("/api/bookings/availability", async (req, res) => {
   }
 });
 
-app.post("/api/bookings/", async (req, res) => {
+app.post("/api/bookings/", authMiddleware, async (req, res) => {
   const { roomId, checkInDate, checkOutDate, guestCount } = req.body || {};
 
   if (!roomId || !checkInDate || !checkOutDate || !guestCount || Number(guestCount) < 1) {

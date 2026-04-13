@@ -82,6 +82,8 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
+      mongodb:
+        condition: service_healthy   # FIX: was missing — notification tries to connect to mongo on startup
     ports:
       - "4004:4004"
 
