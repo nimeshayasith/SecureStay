@@ -83,8 +83,10 @@ jobs:
           username: ec2-user
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            cd /home/ec2-user/securestay || exit 1
-            echo "Pulling latest images..."
-            docker compose pull
-            echo "Restarting services..."
-            docker compose up -d
+           if [ ! -d "SecureStay" ]; then
+              git clone https://github.com/<your-username>/SecureStay.git
+           fi
+           cd SecureStay
+           git pull
+           docker compose pull
+           docker compose up -d
