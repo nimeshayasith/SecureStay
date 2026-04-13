@@ -84,7 +84,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
            if [ ! -d "SecureStay" ]; then
-              git clone https://github.com/<your-username>/SecureStay.git
+              git clone https://github.com/nimeshayasith/SecureStay.git
            fi
            cd SecureStay
            git pull
