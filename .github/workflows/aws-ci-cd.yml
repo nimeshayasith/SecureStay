@@ -40,7 +40,7 @@ jobs:
           docker build -t $ECR_REPOSITORY-auth ./services/auth-service
           docker build -t $ECR_REPOSITORY-booking ./services/booking-service
           docker build -t $ECR_REPOSITORY-payment ./services/payment-service
-          docker build -t $ECR_REPOSITORY-gateway ./services/gateway
+      
           docker build -t $ECR_REPOSITORY-notification ./services/notification-service
 
       # 5. Tag images for ECR
@@ -51,7 +51,6 @@ jobs:
           docker tag $ECR_REPOSITORY-auth:latest $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY-auth:latest
           docker tag $ECR_REPOSITORY-booking:latest $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY-booking:latest
           docker tag $ECR_REPOSITORY-payment:latest $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY-payment:latest
-          docker tag $ECR_REPOSITORY-gateway:latest $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY-gateway:latest
           docker tag $ECR_REPOSITORY-notification:latest $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY-notification:latest
 
       # 6. Push images to ECR
@@ -62,7 +61,6 @@ jobs:
           docker push $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY-auth:latest
           docker push $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY-booking:latest
           docker push $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY-payment:latest
-          docker push $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY-gateway:latest
           docker push $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY-notification:latest
 
   deploy-to-ec2:
