@@ -3,9 +3,8 @@ name: SecureStay AWS CI/CD Pipeline
 on:
   push:
     branches:
-      - main 
+      - main
       - dayani
-  # change if you deploy from another branch
 
 env:
   AWS_REGION: us-east-1
@@ -29,38 +28,47 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      # 3. Login to Amazon ECR
+      # 🔥 3. AUTO CREATE ECR REPOSITORIES
+      - name: Create ECR repositories if not exist
+        run: |
+          aws ecr describe-repositories --repository-names securestay-auth || aws ecr create-repository --repository-name securestay-auth
+          aws ecr describe-repositories --repository-names securestay-booking || aws ecr create-repository --repository-name securestay-booking
+          aws ecr describe-repositories --repository-names securestay-payment || aws ecr create-repository --repository-name securestay-payment
+          aws ecr describe-repositories --repository-names securestay-gateway || aws ecr create-repository --repository-name securestay-gateway
+          aws ecr describe-repositories --repository-names securestay-notification || aws ecr create-repository --repository-name securestay-notification
+
+      # 4. Login to Amazon ECR
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      # 4. Build Docker images
+      # 5. Build Docker images
       - name: Build Docker images
         run: |
           docker build -t $ECR_REPOSITORY-auth ./services/auth-service
           docker build -t $ECR_REPOSITORY-booking ./services/booking-service
           docker build -t $ECR_REPOSITORY-payment ./services/payment-service
-      
+          docker build -t $ECR_REPOSITORY-gateway ./gateway
           docker build -t $ECR_REPOSITORY-notification ./services/notification-service
 
-      # 5. Tag images for ECR
+      # 6. Tag images
       - name: Tag images
         run: |
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-
           docker tag $ECR_REPOSITORY-auth:latest $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY-auth:latest
           docker tag $ECR_REPOSITORY-booking:latest $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY-booking:latest
           docker tag $ECR_REPOSITORY-payment:latest $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY-payment:latest
+          docker tag $ECR_REPOSITORY-gateway:latest $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY-gateway:latest
           docker tag $ECR_REPOSITORY-notification:latest $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY-notification:latest
 
-      # 6. Push images to ECR
+      # 7. Push images
       - name: Push images
         run: |
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-
           docker push $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY-auth:latest
           docker push $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY-booking:latest
           docker push $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY-payment:latest
+          docker push $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY-gateway:latest
           docker push $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY-notification:latest
 
   deploy-to-ec2:
@@ -75,10 +83,8 @@ jobs:
           username: ec2-user
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            cd /home/ec2-user/securestay
-
+            cd /home/ec2-user/securestay || exit 1
             echo "Pulling latest images..."
-            docker compose -f docker-compose.yml -f docker-compose.aws.yml pull
-
+            docker compose pull
             echo "Restarting services..."
-            docker compose -f docker-compose.yml -f docker-compose.aws.yml up -d
+            docker compose up -d
