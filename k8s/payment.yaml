@@ -32,6 +32,36 @@ spec:
             - name: PORT
               value: "4003"
             - name: DATABASE_URL
-              value: postgresql://securestay:securestay@postgres:5432/securestay
+              valueFrom:
+                secretKeyRef:
+                  name: securestay-secrets
+                  key: database-url
+            # FIX: was missing — service defaulted to http://localhost:4002 (broken in K8s)
+            - name: BOOKING_SERVICE_INTERNAL_URL
+              valueFrom:
+                secretKeyRef:
+                  name: securestay-secrets
+                  key: booking-service-internal-url
+            # FIX: JWT_SECRET was missing
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: securestay-secrets
+                  key: jwt-secret
             - name: RABBITMQ_URL
-              value: amqp://rabbitmq:5672
+              valueFrom:
+                secretKeyRef:
+                  name: securestay-secrets
+                  key: rabbitmq-url
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 4003
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 4003
+            initialDelaySeconds: 20
+            periodSeconds: 20

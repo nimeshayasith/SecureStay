@@ -13,7 +13,7 @@ kind: Deployment
 metadata:
   name: booking-service
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app: booking-service
@@ -32,6 +32,31 @@ spec:
             - name: PORT
               value: "4002"
             - name: DATABASE_URL
-              value: postgresql://securestay:securestay@postgres:5432/securestay
+              valueFrom:
+                secretKeyRef:
+                  name: securestay-secrets
+                  key: database-url
+            # FIX: JWT_SECRET was missing — tokens validated with wrong secret
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: securestay-secrets
+                  key: jwt-secret
+            # FIX: was "amqp://rabbitmq:5672" — correct full AMQP URI below
             - name: RABBITMQ_URL
-              value: amqp://rabbitmq:5672
+              valueFrom:
+                secretKeyRef:
+                  name: securestay-secrets
+                  key: rabbitmq-url
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 4002
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 4002
+            initialDelaySeconds: 20
+            periodSeconds: 20

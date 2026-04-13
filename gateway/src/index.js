@@ -19,7 +19,7 @@ const services = {
 
 app.use(morgan("dev"));
 app.use(cors());
-app.use(express.json());
+
 
 /* ================= HEALTH ================= */
 app.get("/health", (_req, res) => {
@@ -27,56 +27,79 @@ app.get("/health", (_req, res) => {
 });
 
 /* ================= PROXY OPTIONS ================= */
+// pathRewrite is optional — only pass it when the service needs path transformation
 const proxyOptions = (target, pathRewriteRule) => ({
   target,
   changeOrigin: true,
   timeout: 10000,
   proxyTimeout: 10000,
   logLevel: "debug",
-  pathRewrite: pathRewriteRule,
+  ...(pathRewriteRule && { pathRewrite: pathRewriteRule }),
   onError(err, req, res) {
     console.error("Proxy error:", err.message);
     res.status(500).json({ message: "Service unavailable" });
   }
 });
 
-/* ================= AUTH ================= */
+/* ================= AUTH ===================
+   Auth service routes: /register  /login  /me  /health
+   Gateway receives:    /api/auth/register
+   Rewrite strips /api/auth → "" so service sees /register  ✓
+*/
 app.use(
   "/api/auth",
   createProxyMiddleware(
-    proxyOptions(services.auth, {
-      "^/api/auth": ""
-    })
+    proxyOptions(services.auth, { "^/api/auth": "" })
   )
 );
 
-/* ================= BOOKINGS ================= */
+/* ================= BLOCK INTERNAL ROUTES =================
+   Internal routes are for service-to-service communication only.
+   They must never be accessible through the public gateway.
+*/
+app.use("/api/bookings/internal", (_req, res) => {
+  res.status(404).json({ message: "Route not found" });
+});
+
+app.use("/api/payments/internal", (_req, res) => {
+  res.status(404).json({ message: "Route not found" });
+});
+
+/* ================= BOOKINGS ================
+   Booking service routes: /api/bookings/hotels  /api/bookings/rooms  etc.
+   Gateway receives:        /api/bookings/hotels
+   NO rewrite — forward the full path as-is so service sees /api/bookings/hotels  ✓
+   FIX: removed pathRewrite that was stripping /api/bookings → "" causing 404s
+*/
 app.use(
   "/api/bookings",
   createProxyMiddleware(
-    proxyOptions(services.bookings, {
-      "^/api/bookings": ""
-    })
+    proxyOptions(services.bookings, { "^/": "/api/bookings/" })
   )
 );
 
-/* ================= PAYMENTS ================= */
+/* ================= PAYMENTS ================
+   Payment service routes: /api/payments/  /api/payments/:id
+   Gateway receives:        /api/payments/
+   NO rewrite — same reason as bookings  ✓
+   FIX: removed pathRewrite that was stripping /api/payments → "" causing 404s
+*/
 app.use(
   "/api/payments",
   createProxyMiddleware(
-    proxyOptions(services.payments, {
-      "^/api/payments": ""
-    })
+    proxyOptions(services.payments, { "^/": "/api/payments/" })
   )
 );
-
-/* ================= NOTIFICATIONS (ADD THIS) ================= */
+/* ================= NOTIFICATIONS ===========
+   Notification service routes: /notifications  /notifications/logs
+   Gateway receives:             /api/notifications  /api/notifications/logs
+   Rewrite: /api/notifications → /notifications  ✓
+   FIX: was rewriting to "" which gave the service an empty path → 404
+*/
 app.use(
   "/api/notifications",
   createProxyMiddleware(
-    proxyOptions(services.notifications, {
-      "^/api/notifications": ""
-    })
+    proxyOptions(services.notifications, { "^/": "/notifications" })
   )
 );
 

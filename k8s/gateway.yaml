@@ -27,7 +27,7 @@ spec:
     spec:
       containers:
         - name: gateway
-          image: lasindu123/gateway:1.0
+          image: lasindu123/gateway:1.1
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 4000

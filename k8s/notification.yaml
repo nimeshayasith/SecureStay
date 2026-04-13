@@ -29,5 +29,28 @@ spec:
           ports:
             - containerPort: 4004
           env:
+            - name: PORT
+              value: "4004"
+            # FIX: MONGODB_URL was missing — defaulted to localhost:27017 (broken in K8s)
+            - name: MONGODB_URL
+              valueFrom:
+                secretKeyRef:
+                  name: securestay-secrets
+                  key: mongodb-url
             - name: RABBITMQ_URL
-              value: amqp://rabbitmq:5672
+              valueFrom:
+                secretKeyRef:
+                  name: securestay-secrets
+                  key: rabbitmq-url
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 4004
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 4004
+            initialDelaySeconds: 20
+            periodSeconds: 20
