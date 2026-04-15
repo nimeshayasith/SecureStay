@@ -119,8 +119,6 @@ jobs:
           helm upgrade --install securestay ./helm/securestay \
             --namespace ${{ env.NAMESPACE }} \
             --create-namespace \
-            --atomic \
-            --timeout 8m \
             --set global.imageRegistry=${ECR} \
             --set apiGateway.tag=${IMAGE_TAG} \
             --set authService.tag=${IMAGE_TAG} \
@@ -128,12 +126,28 @@ jobs:
             --set paymentService.tag=${IMAGE_TAG} \
             --set notificationService.tag=${IMAGE_TAG}
 
+      - name: Wait for migration job
+        run: |
+          kubectl wait \
+            --for=condition=complete \
+            --timeout=10m \
+            job/securestay-db-migrate \
+            -n ${{ env.NAMESPACE }}
+
       - name: Verify all rollouts are healthy
         run: |
-          for svc in api-gateway auth-service booking-service payment-service notification-service; do
-            kubectl rollout status deployment/${svc} -n ${{ env.NAMESPACE }} --timeout=3m
+          for svc in rabbitmq api-gateway auth-service booking-service payment-service notification-service; do
+            kubectl rollout status deployment/${svc} -n ${{ env.NAMESPACE }} --timeout=5m
             echo "${svc} is running"
           done
+
+      - name: Show diagnostics on failure
+        if: failure()
+        run: |
+          kubectl get all -n ${{ env.NAMESPACE }} || true
+          kubectl get events -n ${{ env.NAMESPACE }} --sort-by=.lastTimestamp || true
+          kubectl describe job/securestay-db-migrate -n ${{ env.NAMESPACE }} || true
+          kubectl logs job/securestay-db-migrate -n ${{ env.NAMESPACE }} --all-containers=true || true
 
       - name: Confirm notification-service uses PostgreSQL (not MongoDB)
         run: |
