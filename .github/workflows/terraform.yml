@@ -12,7 +12,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: terraform   
+        working-directory: terraform   # ✅ THIS IS THE FIX
 
     steps:
       - name: Checkout code
