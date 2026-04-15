@@ -119,6 +119,7 @@ jobs:
           helm upgrade --install securestay ./helm/securestay \
             --namespace ${{ env.NAMESPACE }} \
             --create-namespace \
+            --timeout 10m \
             --set global.imageRegistry=${ECR} \
             --set apiGateway.tag=${IMAGE_TAG} \
             --set authService.tag=${IMAGE_TAG} \

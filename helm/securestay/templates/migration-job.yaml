@@ -7,9 +7,10 @@ metadata:
   annotations:
     "helm.sh/hook": pre-install,pre-upgrade
     "helm.sh/hook-weight": "-5"
-    "helm.sh/hook-delete-policy": hook-succeeded
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
 spec:
-  backoffLimit: 3
+  activeDeadlineSeconds: 300
+  backoffLimit: 1
   template:
     spec:
       restartPolicy: Never
@@ -20,8 +21,10 @@ spec:
             - sh
             - -c
             - |
+              set -eu
               echo "Running schema migration..."
-              psql "$DATABASE_URL" -c "
+              psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -c "
+                CREATE EXTENSION IF NOT EXISTS pgcrypto;
                 CREATE TABLE IF NOT EXISTS users (
                   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                   email VARCHAR(255) UNIQUE NOT NULL,
@@ -106,4 +109,6 @@ spec:
                 secretKeyRef:
                   name: securestay-secrets
                   key: database-url
+            - name: PGCONNECT_TIMEOUT
+              value: "15"
 {{- end }}
