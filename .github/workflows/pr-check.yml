@@ -4,6 +4,9 @@ on:
   pull_request:
     branches: [aws_cloud]
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build-check:
     name: "Build — ${{ matrix.service }}"
@@ -24,10 +27,10 @@ jobs:
             context: ./services/notification-service
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2
 
       - name: Build Docker image (no push)
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.context }}
           push: false
