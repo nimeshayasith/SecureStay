@@ -1,4 +1,4 @@
-name: SecureStay CI/CD Pipeline
+name: SecureStay CI/CD Pipeline- Deploy
 
 on:
   push:
@@ -72,7 +72,7 @@ jobs:
           cd /opt
 
           if [ ! -d "securestay" ]; then
-            git clone https://github.com/<your-username>/SecureStay.git securestay
+            git clone https://github.com/nimeshayasith/SecureStay.git securestay
           fi
 
           cd securestay
