@@ -1,21 +1,18 @@
-name: "App Pipeline — Build → Push → Deploy"
+name: "App Pipeline - Build -> Push -> Deploy"
 
 on:
   push:
     branches: [aws_cloud]
 
 env:
-  AWS_REGION:   us-east-1
+  AWS_REGION: us-east-1
   CLUSTER_NAME: securestay-eks
-  NAMESPACE:    securestay
+  NAMESPACE: securestay
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  # ─────────────────────────────────────────────────────────────
-  # Job 1: Build and push all Docker images to ECR in parallel
-  # ─────────────────────────────────────────────────────────────
   build-and-push:
-    name: "Build & Push — ${{ matrix.service }}"
+    name: "Build & Push - ${{ matrix.service }}"
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -42,9 +39,9 @@ jobs:
 
       - uses: aws-actions/configure-aws-credentials@v4.0.2
         with:
-          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region:            ${{ env.AWS_REGION }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - uses: aws-actions/amazon-ecr-login@v2.0.1
         id: login-ecr
@@ -65,25 +62,22 @@ jobs:
             ${{ steps.login-ecr.outputs.registry }}/securestay/${{ matrix.service }}:${{ steps.tag.outputs.version }}
             ${{ steps.login-ecr.outputs.registry }}/securestay/${{ matrix.service }}:latest
           cache-from: type=gha
-          cache-to:   type=gha,mode=max
+          cache-to: type=gha,mode=max
 
-  # ─────────────────────────────────────────────────────────────
-  # Job 2: Deploy to EKS via Helm (runs after all builds pass)
-  # ─────────────────────────────────────────────────────────────
   deploy:
     name: "Deploy to EKS via Helm"
     needs: build-and-push
     runs-on: ubuntu-latest
-    environment: production       # Manual approval gate in GitHub → Settings → Environments
+    environment: production
 
     steps:
       - uses: actions/checkout@v4.2.2
 
       - uses: aws-actions/configure-aws-credentials@v4.0.2
         with:
-          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region:            ${{ env.AWS_REGION }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - uses: aws-actions/amazon-ecr-login@v2.0.1
         id: login-ecr
@@ -108,7 +102,6 @@ jobs:
           kubectl create namespace ${{ env.NAMESPACE }} --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Create Kubernetes Secret (all service env vars)
-        # MONGODB_URL is intentionally absent — notification-service uses DATABASE_URL
         run: |
           kubectl create secret generic securestay-secrets \
             --namespace=${{ env.NAMESPACE }} \
@@ -118,7 +111,7 @@ jobs:
             --from-literal=payment-secret="${{ secrets.PAYMENT_SECRET }}" \
             --dry-run=client -o yaml | kubectl apply -f -
 
-      - name: Helm upgrade — deploy all services with new image tag
+      - name: Helm upgrade - deploy all services with new image tag
         run: |
           IMAGE_TAG=${{ steps.tag.outputs.version }}
           ECR=${{ steps.login-ecr.outputs.registry }}
@@ -158,5 +151,10 @@ jobs:
       - name: Rollback on failure
         if: failure()
         run: |
-          echo "Deployment failed — rolling back"
-          helm rollback securestay --namespace ${{ env.NAMESPACE }}
+          echo "Deployment failed - checking for an existing Helm release"
+          if helm status securestay --namespace ${{ env.NAMESPACE }} >/dev/null 2>&1; then
+            echo "Existing release found - rolling back"
+            helm rollback securestay --namespace ${{ env.NAMESPACE }}
+          else
+            echo "No existing Helm release found - skipping rollback"
+          fi
