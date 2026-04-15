@@ -9,7 +9,7 @@ migration:
 apiGateway:
   image: securestay/api-gateway
   tag: "latest"
-  replicas: 2
+  replicas: 1
   port: 4000
   resources:
     requests: { cpu: "100m", memory: "128Mi" }
@@ -18,7 +18,7 @@ apiGateway:
 authService:
   image: securestay/auth-service
   tag: "latest"
-  replicas: 2
+  replicas: 1
   port: 4001
   resources:
     requests: { cpu: "100m", memory: "128Mi" }
@@ -27,7 +27,7 @@ authService:
 bookingService:
   image: securestay/booking-service
   tag: "latest"
-  replicas: 2
+  replicas: 1
   port: 4002
   resources:
     requests: { cpu: "100m", memory: "128Mi" }
@@ -36,7 +36,7 @@ bookingService:
 paymentService:
   image: securestay/payment-service
   tag: "latest"
-  replicas: 2
+  replicas: 1
   port: 4003
   resources:
     requests: { cpu: "100m", memory: "128Mi" }
