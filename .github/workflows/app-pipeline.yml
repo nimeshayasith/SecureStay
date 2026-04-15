@@ -126,14 +126,6 @@ jobs:
             --set paymentService.tag=${IMAGE_TAG} \
             --set notificationService.tag=${IMAGE_TAG}
 
-      - name: Wait for migration job
-        run: |
-          kubectl wait \
-            --for=condition=complete \
-            --timeout=10m \
-            job/securestay-db-migrate \
-            -n ${{ env.NAMESPACE }}
-
       - name: Verify all rollouts are healthy
         run: |
           for svc in rabbitmq api-gateway auth-service booking-service payment-service notification-service; do
@@ -146,8 +138,13 @@ jobs:
         run: |
           kubectl get all -n ${{ env.NAMESPACE }} || true
           kubectl get events -n ${{ env.NAMESPACE }} --sort-by=.lastTimestamp || true
-          kubectl describe job/securestay-db-migrate -n ${{ env.NAMESPACE }} || true
-          kubectl logs job/securestay-db-migrate -n ${{ env.NAMESPACE }} --all-containers=true || true
+          kubectl get jobs -n ${{ env.NAMESPACE }} || true
+          if kubectl get job/securestay-db-migrate -n ${{ env.NAMESPACE }} >/dev/null 2>&1; then
+            kubectl describe job/securestay-db-migrate -n ${{ env.NAMESPACE }} || true
+            kubectl logs job/securestay-db-migrate -n ${{ env.NAMESPACE }} --all-containers=true || true
+          else
+            echo "Migration hook job is not present. It may have been deleted after success."
+          fi
 
       - name: Confirm notification-service uses PostgreSQL (not MongoDB)
         run: |
@@ -167,8 +164,14 @@ jobs:
         run: |
           echo "Deployment failed - checking for an existing Helm release"
           if helm status securestay --namespace ${{ env.NAMESPACE }} >/dev/null 2>&1; then
-            echo "Existing release found - rolling back"
-            helm rollback securestay --namespace ${{ env.NAMESPACE }}
+            REVISION_COUNT=$(helm history securestay --namespace ${{ env.NAMESPACE }} 2>/dev/null | tail -n +2 | wc -l | tr -d ' ')
+            if [ "${REVISION_COUNT}" -ge 2 ]; then
+              echo "Existing release has prior revisions - rolling back"
+              helm rollback securestay --namespace ${{ env.NAMESPACE }}
+            else
+              echo "Release has no previous revision - uninstalling failed release"
+              helm uninstall securestay --namespace ${{ env.NAMESPACE }} || true
+            fi
           else
             echo "No existing Helm release found - skipping rollback"
           fi
