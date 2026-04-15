@@ -1,0 +1,159 @@
+name: "App Pipeline — Build → Push → Deploy"
+
+on:
+  push:
+    branches: [main]
+
+env:
+  AWS_REGION:   us-east-1
+  CLUSTER_NAME: securestay-eks
+  NAMESPACE:    securestay
+
+jobs:
+  # ─────────────────────────────────────────────────────────────
+  # Job 1: Build and push all Docker images to ECR in parallel
+  # ─────────────────────────────────────────────────────────────
+  build-and-push:
+    name: "Build & Push — ${{ matrix.service }}"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: api-gateway
+            context: ./gateway
+          - service: auth-service
+            context: ./services/auth-service
+          - service: booking-service
+            context: ./services/booking-service
+          - service: payment-service
+            context: ./services/payment-service
+          - service: notification-service
+            context: ./services/notification-service
+
+    outputs:
+      image_tag: ${{ steps.tag.outputs.version }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region:            ${{ env.AWS_REGION }}
+
+      - uses: aws-actions/amazon-ecr-login@v2
+        id: login-ecr
+
+      - name: Generate image tag
+        id: tag
+        run: |
+          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+          TIMESTAMP=$(date +%Y%m%d%H%M%S)
+          echo "version=${TIMESTAMP}-${SHORT_SHA}" >> $GITHUB_OUTPUT
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.context }}
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/securestay/${{ matrix.service }}:${{ steps.tag.outputs.version }}
+            ${{ steps.login-ecr.outputs.registry }}/securestay/${{ matrix.service }}:latest
+          cache-from: type=gha
+          cache-to:   type=gha,mode=max
+
+  # ─────────────────────────────────────────────────────────────
+  # Job 2: Deploy to EKS via Helm (runs after all builds pass)
+  # ─────────────────────────────────────────────────────────────
+  deploy:
+    name: "Deploy to EKS via Helm"
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment: production       # Manual approval gate in GitHub → Settings → Environments
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region:            ${{ env.AWS_REGION }}
+
+      - uses: aws-actions/amazon-ecr-login@v2
+        id: login-ecr
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.CLUSTER_NAME }}
+
+      - uses: azure/setup-helm@v3
+        with:
+          version: "3.14.0"
+
+      - name: Generate image tag
+        id: tag
+        run: |
+          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+          TIMESTAMP=$(date +%Y%m%d%H%M%S)
+          echo "version=${TIMESTAMP}-${SHORT_SHA}" >> $GITHUB_OUTPUT
+
+      - name: Create namespace
+        run: |
+          kubectl create namespace ${{ env.NAMESPACE }} --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Create Kubernetes Secret (all service env vars)
+        # MONGODB_URL is intentionally absent — notification-service uses DATABASE_URL
+        run: |
+          kubectl create secret generic securestay-secrets \
+            --namespace=${{ env.NAMESPACE }} \
+            --from-literal=database-url="${{ secrets.DATABASE_URL }}" \
+            --from-literal=jwt-secret="${{ secrets.JWT_SECRET }}" \
+            --from-literal=rabbitmq-url="${{ secrets.RABBITMQ_URL }}" \
+            --from-literal=payment-secret="${{ secrets.PAYMENT_SECRET }}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Helm upgrade — deploy all services with new image tag
+        run: |
+          IMAGE_TAG=${{ steps.tag.outputs.version }}
+          ECR=${{ steps.login-ecr.outputs.registry }}
+
+          helm upgrade --install securestay ./helm/securestay \
+            --namespace ${{ env.NAMESPACE }} \
+            --create-namespace \
+            --atomic \
+            --timeout 8m \
+            --set global.imageRegistry=${ECR} \
+            --set apiGateway.tag=${IMAGE_TAG} \
+            --set authService.tag=${IMAGE_TAG} \
+            --set bookingService.tag=${IMAGE_TAG} \
+            --set paymentService.tag=${IMAGE_TAG} \
+            --set notificationService.tag=${IMAGE_TAG}
+
+      - name: Verify all rollouts are healthy
+        run: |
+          for svc in api-gateway auth-service booking-service payment-service notification-service; do
+            kubectl rollout status deployment/${svc} -n ${{ env.NAMESPACE }} --timeout=3m
+            echo "${svc} is running"
+          done
+
+      - name: Confirm notification-service uses PostgreSQL (not MongoDB)
+        run: |
+          echo "Checking notification-service env vars:"
+          kubectl get deployment notification-service -n ${{ env.NAMESPACE }} \
+            -o jsonpath='{.spec.template.spec.containers[0].env}' | grep -v MONGODB || true
+          echo "MONGODB_URL must NOT appear above. DATABASE_URL is used instead."
+
+      - name: Show running pods
+        run: kubectl get pods -n ${{ env.NAMESPACE }}
+
+      - name: Show services and ports
+        run: kubectl get svc -n ${{ env.NAMESPACE }}
+
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          echo "Deployment failed — rolling back"
+          helm rollback securestay --namespace ${{ env.NAMESPACE }}
