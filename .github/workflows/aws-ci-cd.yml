@@ -5,6 +5,7 @@ on:
     branches:
       - main 
       - dayani
+      - Nimesha
   # change if you deploy from another branch
 
 env:
