@@ -5,6 +5,8 @@ metadata:
   namespace: {{ .Values.global.namespace }}
 spec:
   replicas: {{ .Values.paymentService.replicas }}
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: payment-service

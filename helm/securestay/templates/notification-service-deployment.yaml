@@ -5,6 +5,8 @@ metadata:
   namespace: {{ .Values.global.namespace }}
 spec:
   replicas: {{ .Values.notificationService.replicas }}
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: notification-service

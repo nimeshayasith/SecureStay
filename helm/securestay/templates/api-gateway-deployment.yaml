@@ -5,6 +5,8 @@ metadata:
   namespace: {{ .Values.global.namespace }}
 spec:
   replicas: {{ .Values.apiGateway.replicas }}
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: api-gateway

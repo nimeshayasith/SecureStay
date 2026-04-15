@@ -5,6 +5,8 @@ metadata:
   namespace: {{ .Values.global.namespace }}
 spec:
   replicas: {{ .Values.authService.replicas }}
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: auth-service
