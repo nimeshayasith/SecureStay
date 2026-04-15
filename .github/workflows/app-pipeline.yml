@@ -130,7 +130,14 @@ jobs:
       - name: Verify all rollouts are healthy
         run: |
           for svc in rabbitmq api-gateway auth-service booking-service payment-service notification-service; do
-            kubectl rollout status deployment/${svc} -n ${{ env.NAMESPACE }} --timeout=5m
+            if ! kubectl rollout status deployment/${svc} -n ${{ env.NAMESPACE }} --timeout=5m; then
+              echo "Rollout failed for ${svc}. Collecting diagnostics..."
+              kubectl describe deployment/${svc} -n ${{ env.NAMESPACE }} || true
+              kubectl get pods -n ${{ env.NAMESPACE }} -l app=${svc} -o wide || true
+              kubectl describe pods -n ${{ env.NAMESPACE }} -l app=${svc} || true
+              kubectl logs -n ${{ env.NAMESPACE }} -l app=${svc} --all-containers=true --tail=200 || true
+              exit 1
+            fi
             echo "${svc} is running"
           done
 
