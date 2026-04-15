@@ -1,0 +1,89 @@
+name: SecureStay CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - dayani
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: securestay-auth
+  IMAGE_TAG: latest
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    # ✅ Checkout code
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    # ✅ Configure AWS
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    # ✅ Get AWS Account ID
+    - name: Get Account ID
+      id: aws-account
+      run: echo "ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)" >> $GITHUB_ENV
+
+    # ✅ Create ECR repo if not exists
+    - name: Ensure ECR repository exists
+      run: |
+        aws ecr describe-repositories --repository-names $ECR_REPOSITORY --region $AWS_REGION || \
+        aws ecr create-repository --repository-name $ECR_REPOSITORY --region $AWS_REGION
+
+    # ✅ Login to ECR
+    - name: Login to ECR
+      run: |
+        aws ecr get-login-password --region $AWS_REGION | \
+        docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+
+    # ✅ Build Docker image
+    - name: Build Docker image
+      run: |
+        docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
+
+    # ✅ Tag image
+    - name: Tag Docker image
+      run: |
+        docker tag $ECR_REPOSITORY:$IMAGE_TAG \
+        $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
+
+    # ✅ Push to ECR
+    - name: Push Docker image
+      run: |
+        docker push $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
+
+    # ✅ Deploy to EC2
+    - name: Deploy to EC2 via SSH
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ec2-user
+        key: ${{ secrets.EC2_SSH_KEY }}
+        script: |
+          cd /opt
+
+          if [ ! -d "securestay" ]; then
+            git clone https://github.com/<your-username>/SecureStay.git securestay
+          fi
+
+          cd securestay
+          git pull
+
+          echo "Logging into ECR..."
+          aws ecr get-login-password --region us-east-1 | \
+          docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com
+
+          echo "Pulling latest image..."
+          docker pull $ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/securestay-auth:latest
+
+          echo "Restarting containers..."
+          docker compose -f docker-compose.yml -f docker-compose.aws.yml up -d
