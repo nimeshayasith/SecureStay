@@ -2,7 +2,7 @@ name: "PR Check — Build & Lint"
 
 on:
   pull_request:
-    branches: [main, develop]
+    branches: [aws_cloud]
 
 jobs:
   build-check:
