@@ -4,90 +4,353 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SecureStay</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
-  <div class="bg-shape bg-shape-a"></div>
-  <div class="bg-shape bg-shape-b"></div>
-  <header class="hero">
-    <h1>SecureStay</h1>
-    <p>Simple, secure hotel booking in one flow.</p>
-    <div class="hero-meta">
-      <span id="authState">Not logged in</span>
-      <button id="logoutBtn" class="ghost-btn" type="button">Log Out</button>
+
+  <!-- Background layers -->
+  <div class="bg-gradient"></div>
+  <div class="bg-noise"></div>
+  <div class="bg-grid"></div>
+
+  <!-- Header -->
+  <header class="site-header">
+    <div class="logo">
+      <span class="logo-diamond">◆</span>
+      <span class="logo-text">SecureStay</span>
+    </div>
+    <div class="header-right">
+      <span class="auth-pill" id="authState">
+        <span class="auth-dot"></span>
+        Not logged in
+      </span>
+      <button id="logoutBtn" class="ghost-btn" type="button">Sign Out</button>
     </div>
   </header>
 
-  <main class="grid">
-    <section class="card">
-      <h2>1. Register</h2>
-      <form id="registerForm">
-        <label>Full Name <input name="fullName" required /></label>
-        <label>Email <input name="email" type="email" required /></label>
-        <label>Password <input name="password" type="password" minlength="8" required /></label>
-        <button type="submit">Create Account</button>
-      </form>
-    </section>
+  <!-- Hero banner -->
+  <section class="hero-banner">
+    <p class="hero-eyebrow">Cloud-native · Secure · Scalable</p>
+    <h1 class="hero-title">Luxury stays,<br/><em>effortlessly booked.</em></h1>
+    <p class="hero-sub">Complete your reservation in six simple steps below.</p>
+  </section>
 
-    <section class="card">
-      <h2>2. Login</h2>
-      <form id="loginForm">
-        <label>Email <input name="email" type="email" required /></label>
-        <label>Password <input name="password" type="password" required /></label>
-        <button type="submit">Login</button>
-      </form>
-    </section>
+  <!-- Step progress bar -->
+  <div class="progress-wrap">
+    <div class="progress-inner">
+      <div class="progress-track">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+      <div class="step-dots" id="stepDots">
+        <button class="step-dot active" data-step="0"><span>1</span><label>Account</label></button>
+<button class="step-dot" data-step="1"><span>2</span><label>Sign Up</label></button>
+        <button class="step-dot" data-step="2"><span>3</span><label>Hotels</label></button>
+        <button class="step-dot" data-step="3"><span>4</span><label>Dates</label></button>
+        <button class="step-dot" data-step="4"><span>5</span><label>Book</label></button>
+        <button class="step-dot" data-step="5"><span>6</span><label>Pay</label></button>
+      </div>
+    </div>
+  </div>
 
-    <section class="card">
-      <h2>3. Browse Hotels</h2>
-      <button id="loadHotelsBtn" type="button">Load Hotels</button>
-      <label>Hotels
-        <select id="hotelSelect"></select>
-      </label>
-      <button id="loadRoomsBtn" type="button">Load Rooms</button>
-      <label>Rooms
-        <select id="roomSelect"></select>
-      </label>
-    </section>
+  <!-- Steps container -->
+  <main class="steps-container">
 
-    <section class="card">
-      <h2>4. Availability</h2>
-      <form id="availabilityForm">
-        <label>Check-in <input name="checkInDate" type="date" required /></label>
-        <label>Check-out <input name="checkOutDate" type="date" required /></label>
-        <button type="submit">Check Availability</button>
-      </form>
-      <p id="availabilityText">No check performed yet.</p>
-    </section>
+    <!-- Step 1: Login --><br/>   <div class="step-panel active" data-panel="0"><br/>    <div class="panel-inner"><br/>       <div class="panel-header"><br/>         <div class="panel-number">01</div><br/>         <div><br/>           <h2>Welcome to SecureStay</h2>
+            <p class="panel-desc">Join SecureStay for a seamless booking experience.</p>
+          </div>
+        </div>
+        <form id="registerForm" class="form-grid">
+          <div class="field">
+            <label>Full Name</label>
+            <input name="fullName" placeholder="Alexandra Reynolds" required />
+          </div>
+          <div class="field">
+            <label>Email Address</label>
+            <input name="email" type="email" placeholder="alex@example.com" required />
+          </div>
+          <div class="field">
+            <label>Password</label>
+            <input name="password" type="password" placeholder="Min. 8 characters" minlength="8" required />
+          </div>
+          <button type="submit" class="cta-btn">
+            <span>Create Account</span>
+            <span class="btn-arrow">→</span>
+          </button>
+        </form>
+        <div class="panel-nav">
+          <button class="nav-next" onclick="goStep(0)">Already have an account? Sign in →</button><br/>       </div><br/>     </div>
+      <div class="panel-art panel-art-1">
+        <div class="art-card">
+          <div class="art-badge">◆ Secure</div>
+          <div class="art-lines">
+            <div class="art-line"></div>
+            <div class="art-line short"></div>
+            <div class="art-line medium"></div>
+          </div>
+          <p class="art-label">bcrypt · JWT · RBAC</p>
+        </div>
+      </div>
+    </div>
 
-    <section class="card">
-      <h2>5. Create Booking</h2>
-      <form id="bookingForm">
-        <label>Guest Count <input name="guestCount" type="number" min="1" value="1" required /></label>
-        <button type="submit">Create Booking</button>
-      </form>
-      <p id="bookingText">No booking yet.</p>
-    </section>
+    <!-- Step 2: Register --><br/>   <div class="step-panel" data-panel="1"><br/>      <div class="panel-inner"><br/>       <div class="panel-header"><br/>         <div class="panel-number">02</div><br/>          <div><br/>           <h2>Sign Up</h2>
+            <p class="panel-desc">Sign in to access your bookings and reservations.</p>
+          </div>
+        </div>
+        <form id="loginForm" class="form-grid">
+          <div class="field">
+            <label>Email Address</label>
+            <input name="email" type="email" placeholder="alex@example.com" required />
+          </div>
+          <div class="field">
+            <label>Password</label>
+            <input name="password" type="password" placeholder="Your password" required />
+          </div>
+          <button type="submit" class="cta-btn">
+            <span>Sign In</span>
+            <span class="btn-arrow">→</span>
+          </button>
+        </form>
+        <div class="panel-nav">
+          <button class="nav-next" onclick="goStep(1)">Don't have an account? Sign up →</button><br/>       </div><br/>      </div>
+      <div class="panel-art panel-art-2">
+        <div class="art-card">
+          <div class="art-token">
+            <span class="token-part">eyJhbGci</span>
+            <span class="token-dot">.</span>
+            <span class="token-part accent">OiJIUzI1</span>
+            <span class="token-dot">.</span>
+            <span class="token-part dim">NiIsIn...</span>
+          </div>
+          <p class="art-label">JWT Protected</p>
+        </div>
+      </div>
+    </div>
 
-    <section class="card">
-      <h2>6. Pay</h2>
-      <form id="paymentForm">
-        <label>Card Number <input name="cardNumber" value="4111111111111111" required /></label>
-        <label>Card Holder <input name="cardHolderName" value="Demo User" required /></label>
-        <label>Expiry Month <input name="expiryMonth" type="number" min="1" max="12" value="12" required /></label>
-        <label>Expiry Year <input name="expiryYear" type="number" min="2026" value="2030" required /></label>
-        <label>CVV (use 000 to fail) <input name="cvv" value="123" required /></label>
-        <button type="submit">Submit Payment</button>
-      </form>
-      <p id="paymentText">No payment yet.</p>
-    </section>
+    <!-- Step 3: Hotels -->
+    <div class="step-panel" data-panel="2">
+      <div class="panel-inner">
+        <div class="panel-header">
+          <div class="panel-number">03</div>
+          <div>
+            <h2>Browse Properties</h2>
+            <p class="panel-desc">Explore our curated collection of premium hotels.</p>
+          </div>
+        </div>
+        <div class="form-grid">
+          <button id="loadHotelsBtn" type="button" class="outline-btn">
+            <span class="btn-icon">⊕</span> Load Hotels
+          </button>
+          <div class="field">
+            <label>Select Hotel</label>
+            <select id="hotelSelect">
+              <option value="">— Choose a hotel —</option>
+            </select>
+          </div>
+          <button id="loadRoomsBtn" type="button" class="outline-btn">
+            <span class="btn-icon">⊕</span> Load Rooms
+          </button>
+          <div class="field">
+            <label>Select Room</label>
+            <select id="roomSelect">
+              <option value="">— Choose a room —</option>
+            </select>
+          </div>
+        </div>
+        <div class="panel-nav">
+          <button class="nav-next" onclick="goStep(3)">Continue to availability →</button>
+        </div>
+      </div>
+      <div class="panel-art panel-art-3">
+        <div class="art-card hotel-art-card">
+          <div class="hotel-stars">★ ★ ★ ★ ★</div>
+          <div class="hotel-name">SecureStay<br/>Colombo Central</div>
+          <div class="hotel-tag">Microservice ↔ Booking DB</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 4: Availability -->
+    <div class="step-panel" data-panel="3">
+      <div class="panel-inner">
+        <div class="panel-header">
+          <div class="panel-number">04</div>
+          <div>
+            <h2>Check Availability</h2>
+            <p class="panel-desc">Select your preferred dates to confirm room availability.</p>
+          </div>
+        </div>
+        <form id="availabilityForm" class="form-grid">
+          <div class="field-row">
+            <div class="field">
+              <label>Check-in Date</label>
+              <input name="checkInDate" type="date" required />
+            </div>
+            <div class="field">
+              <label>Check-out Date</label>
+              <input name="checkOutDate" type="date" required />
+            </div>
+          </div>
+          <button type="submit" class="cta-btn">
+            <span>Check Availability</span>
+            <span class="btn-arrow">→</span>
+          </button>
+        </form>
+        <div class="status-pill" id="availabilityText">No check performed yet.</div>
+        <div class="panel-nav">
+          <button class="nav-next" onclick="goStep(4)">Continue to booking →</button>
+        </div>
+      </div>
+      <div class="panel-art panel-art-4">
+        <div class="art-card calendar-art">
+          <div class="cal-header">April 2026</div>
+          <div class="cal-grid">
+            <span class="cal-day">Mo</span><span class="cal-day">Tu</span><span class="cal-day">We</span><span class="cal-day">Th</span><span class="cal-day">Fr</span>
+            <span class="cal-num">6</span><span class="cal-num">7</span><span class="cal-num">8</span><span class="cal-num">9</span><span class="cal-num">10</span>
+            <span class="cal-num range-start">13</span><span class="cal-num range">14</span><span class="cal-num range">15</span><span class="cal-num range">16</span><span class="cal-num range-end">17</span>
+            <span class="cal-num">20</span><span class="cal-num">21</span><span class="cal-num">22</span><span class="cal-num">23</span><span class="cal-num">24</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 5: Book -->
+    <div class="step-panel" data-panel="4">
+      <div class="panel-inner">
+        <div class="panel-header">
+          <div class="panel-number">05</div>
+          <div>
+            <h2>Confirm Reservation</h2>
+            <p class="panel-desc">Finalize your booking details.</p>
+          </div>
+        </div>
+        <form id="bookingForm" class="form-grid">
+          <div class="field">
+            <label>Number of Guests</label>
+            <input name="guestCount" type="number" min="1" value="1" required />
+          </div>
+          <button type="submit" class="cta-btn gold-btn">
+            <span>Create Booking</span>
+            <span class="btn-arrow">→</span>
+          </button>
+        </form>
+        <div class="booking-result" id="bookingText">No booking yet.</div>
+        <div class="panel-nav">
+          <button class="nav-next" onclick="goStep(5)">Proceed to payment →</button>
+        </div>
+      </div>
+      <div class="panel-art panel-art-5">
+        <div class="art-card">
+          <div class="confirm-icon">✓</div>
+          <div class="art-lines">
+            <div class="art-line"></div>
+            <div class="art-line short"></div>
+          </div>
+          <p class="art-label">RabbitMQ event: booking.created</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 6: Pay -->
+    <div class="step-panel" data-panel="5">
+      <div class="panel-inner">
+        <div class="panel-header">
+          <div class="panel-number">06</div>
+          <div>
+            <h2>Secure Payment</h2>
+            <p class="panel-desc">Your card data is never stored — PCI-DSS safe.</p>
+          </div>
+        </div>
+        <form id="paymentForm" class="form-grid">
+          <div class="field">
+            <label>Card Number</label>
+            <input name="cardNumber" value="4111111111111111" required placeholder="4111 1111 1111 1111" />
+          </div>
+          <div class="field">
+            <label>Cardholder Name</label>
+            <input name="cardHolderName" value="Demo User" required />
+          </div>
+          <div class="field-row three-col">
+            <div class="field">
+              <label>Month</label>
+              <input name="expiryMonth" type="number" min="1" max="12" value="12" required />
+            </div>
+            <div class="field">
+              <label>Year</label>
+              <input name="expiryYear" type="number" min="2026" value="2030" required />
+            </div>
+            <div class="field">
+              <label>CVV</label>
+              <input name="cvv" value="123" placeholder="000=fail" required />
+            </div>
+          </div>
+          <button type="submit" class="cta-btn gold-btn">
+            <span>Complete Payment</span>
+            <span class="btn-arrow">→</span>
+          </button>
+        </form>
+        <div class="payment-result" id="paymentText">No payment yet.</div>
+      </div>
+      <div class="panel-art panel-art-6">
+        <div class="art-card payment-art">
+          <div class="card-chip"></div>
+          <div class="card-num">•••• •••• •••• 1111</div>
+          <div class="card-footer">
+            <span>DEMO USER</span>
+            <span>12/30</span>
+          </div>
+          <div class="art-label" style="margin-top:1rem;">Masked · Never stored</div>
+        </div>
+      </div>
+    </div>
+
   </main>
 
-  <aside class="log-card">
-    <h3>Activity</h3>
+  <!-- Activity Log -->
+  <aside class="activity-panel">
+    <div class="activity-header">
+      <span class="activity-title">◆ Activity Log</span>
+      <span class="activity-live">● Live</span>
+    </div>
     <pre id="logBox"></pre>
   </aside>
 
   <script src="./app.js"></script>
+  <script>
+    // Step navigation
+    const panels = document.querySelectorAll('.step-panel');
+    const dots = document.querySelectorAll('.step-dot');
+    const fill = document.getElementById('progressFill');
+
+    function goStep(n) {
+      panels.forEach(p => p.classList.remove('active'));
+      dots.forEach(d => d.classList.remove('active', 'done'));
+      panels[n].classList.add('active');
+      dots.forEach((d, i) => {
+        if (i < n) d.classList.add('done');
+        if (i === n) d.classList.add('active');
+      });
+      fill.style.width = `${(n / (panels.length - 1)) * 100}%`;
+      panels[n].scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    dots.forEach(d => d.addEventListener('click', () => goStep(+d.dataset.step)));
+
+    // Auto-advance after login
+    document.getElementById('loginForm').addEventListener('submit', () => {
+      setTimeout(() => { if (document.getElementById('authState').textContent.includes('Logged in')) goStep(2); }, 500);
+    });
+    document.getElementById('registerForm').addEventListener('submit', () => {
+      setTimeout(() => goStep(1), 600);
+    });
+    document.getElementById('availabilityForm').addEventListener('submit', () => {
+      setTimeout(() => goStep(4), 600);
+    });
+    document.getElementById('bookingForm').addEventListener('submit', () => {
+      setTimeout(() => goStep(5), 800);
+    });
+  </script>
 </body>
 </html>

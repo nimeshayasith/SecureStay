@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: booking-service
+  namespace: {{ .Values.global.namespace }}
+spec:
+  selector:
+    app: booking-service
+  ports:
+    - port: {{ .Values.bookingService.port }}
+      targetPort: {{ .Values.bookingService.port }}
+  type: ClusterIP
