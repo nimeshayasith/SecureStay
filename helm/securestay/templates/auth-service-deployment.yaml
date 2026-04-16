@@ -5,6 +5,7 @@ metadata:
   namespace: {{ .Values.global.namespace }}
 spec:
   replicas: {{ .Values.authService.replicas }}
+  revisionHistoryLimit: 1
   strategy:
     type: Recreate
   selector:

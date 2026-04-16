@@ -111,6 +111,14 @@ jobs:
             --from-literal=payment-secret="${{ secrets.PAYMENT_SECRET }}" \
             --dry-run=client -o yaml | kubectl apply -f -
 
+      - name: Clean up unschedulable pods from previous failed rollouts
+        run: |
+          kubectl delete pod -n ${{ env.NAMESPACE }} --field-selector=status.phase=Pending --ignore-not-found=true || true
+          for svc in api-gateway auth-service booking-service payment-service notification-service; do
+            kubectl scale deployment/${svc} -n ${{ env.NAMESPACE }} --replicas=0 || true
+          done
+          kubectl get pods -n ${{ env.NAMESPACE }} || true
+
       - name: Helm upgrade - deploy all services with new image tag
         run: |
           IMAGE_TAG=${{ steps.tag.outputs.version }}
