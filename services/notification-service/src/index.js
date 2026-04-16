@@ -9,7 +9,15 @@ const rabbitmqUrl = process.env.RABBITMQ_URL || "amqp://rabbitmq.messaging.svc.c
 const eventsExchange = process.env.EVENTS_EXCHANGE || "securestay.events";
 const notificationQueue = process.env.NOTIFICATION_QUEUE || "securestay.notifications";
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const useSslForDatabase =
+  process.env.DATABASE_URL &&
+  (process.env.DATABASE_URL.includes("sslmode=require") ||
+    process.env.NODE_ENV === "production");
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: useSslForDatabase ? { rejectUnauthorized: false } : undefined
+});
 
 app.get("/health", (_req, res) => {
   res.status(200).json({ status: "ok", service: "notification-service" });

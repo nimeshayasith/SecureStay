@@ -8,8 +8,14 @@ const { Pool } = require("pg");
 const app = express();
 const port = Number(process.env.PORT || 4001);
 
+const useSslForDatabase =
+  process.env.DATABASE_URL &&
+  (process.env.DATABASE_URL.includes("sslmode=require") ||
+    process.env.NODE_ENV === "production");
+
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL
+  connectionString: process.env.DATABASE_URL,
+  ssl: useSslForDatabase ? { rejectUnauthorized: false } : undefined
 });
 
 const jwtSecret = process.env.JWT_SECRET || "securestay-dev-secret";
