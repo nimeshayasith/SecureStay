@@ -10,7 +10,7 @@ const port = Number(process.env.PORT || 4002);
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const jwtSecret = process.env.JWT_SECRET || "securestay-dev-secret";
 
-const rabbitmqUrl = process.env.RABBITMQ_URL || "amqp://rabbitmq.default.svc.cluster.local:5672";
+const rabbitmqUrl = process.env.RABBITMQ_URL || "amqp://rabbitmq.messaging.svc.cluster.local:5672";
 const bookingEventsExchange = process.env.BOOKING_EVENTS_EXCHANGE || "securestay.events";
 let eventChannel;
 

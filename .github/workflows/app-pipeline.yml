@@ -111,8 +111,10 @@ jobs:
       - name: Clean up unschedulable pods from previous failed rollouts
         run: |
           kubectl delete pod -n ${{ env.NAMESPACE }} --field-selector=status.phase=Pending --ignore-not-found=true || true
+          kubectl delete deployment/rabbitmq -n ${{ env.NAMESPACE }} --ignore-not-found=true || true
           for svc in api-gateway auth-service booking-service payment-service notification-service; do
             kubectl scale deployment/${svc} -n ${{ env.NAMESPACE }} --replicas=0 || true
+            kubectl delete rs -n ${{ env.NAMESPACE }} -l app=${svc} --ignore-not-found=true || true
           done
           kubectl get pods -n ${{ env.NAMESPACE }} || true
 
@@ -145,7 +147,7 @@ jobs:
 
       - name: Verify all rollouts are healthy
         run: |
-          for svc in rabbitmq api-gateway auth-service booking-service payment-service notification-service; do
+          for svc in api-gateway auth-service booking-service payment-service notification-service; do
             if ! kubectl rollout status deployment/${svc} -n ${{ env.NAMESPACE }} --timeout=5m; then
               echo "Rollout failed for ${svc}. Collecting diagnostics..."
               kubectl describe deployment/${svc} -n ${{ env.NAMESPACE }} || true

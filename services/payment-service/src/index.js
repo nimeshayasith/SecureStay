@@ -14,7 +14,7 @@ const bookingServiceInternalUrl =
   process.env.BOOKING_SERVICE_INTERNAL_URL || "http://localhost:4002";
 
 const rabbitmqUrl =
-  process.env.RABBITMQ_URL || "amqp://rabbitmq.default.svc.cluster.local:5672";
+  process.env.RABBITMQ_URL || "amqp://rabbitmq.messaging.svc.cluster.local:5672";
 const paymentEventsExchange =
   process.env.PAYMENT_EVENTS_EXCHANGE || "securestay.events";
 let eventChannel;

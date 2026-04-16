@@ -5,7 +5,7 @@ const { Pool } = require("pg");
 
 const app = express();
 const port = Number(process.env.PORT || 4004);
-const rabbitmqUrl = process.env.RABBITMQ_URL || "amqp://rabbitmq.default.svc.cluster.local:5672";
+const rabbitmqUrl = process.env.RABBITMQ_URL || "amqp://rabbitmq.messaging.svc.cluster.local:5672";
 const eventsExchange = process.env.EVENTS_EXCHANGE || "securestay.events";
 const notificationQueue = process.env.NOTIFICATION_QUEUE || "securestay.notifications";
 
