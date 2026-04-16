@@ -206,6 +206,13 @@ jobs:
       - name: Show services and ports
         run: kubectl get svc -n ${{ env.NAMESPACE }}
 
+      - name: Show public endpoint
+        run: |
+          echo "Waiting for api-gateway load balancer hostname..."
+          kubectl get svc api-gateway -n ${{ env.NAMESPACE }} \
+            -o jsonpath='{.status.loadBalancer.ingress[0].hostname}{"\n"}' || true
+          kubectl get svc api-gateway -n ${{ env.NAMESPACE }} -o wide || true
+
       - name: Rollback on failure
         if: failure()
         run: |

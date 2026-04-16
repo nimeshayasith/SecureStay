@@ -11,6 +11,9 @@ apiGateway:
   tag: "latest"
   replicas: 1
   port: 4000
+  service:
+    type: LoadBalancer
+    annotations: {}
   resources:
     requests: { cpu: "100m", memory: "128Mi" }
     limits:   { cpu: "500m", memory: "256Mi" }
@@ -52,7 +55,7 @@ notificationService:
     limits:   { cpu: "200m", memory: "128Mi" }
 
 ingress:
-  enabled: true
+  enabled: false
   className: nginx
   host: app.securestay.com
   annotations:
