@@ -113,6 +113,20 @@ jobs:
         run: |
           kubectl create namespace ${{ env.NAMESPACE }} --dry-run=client -o yaml | kubectl apply -f -
 
+      - name: Validate required secret formats
+        run: |
+          if ! printf '%s' "${{ secrets.DATABASE_URL }}" | grep -Eq '^postgres(ql)?://.+:.+@.+/.+'; then
+            echo "DATABASE_URL is not a full PostgreSQL connection string."
+            echo "Expected format: postgresql://<username>:<password>@<host>:5432/<database>?sslmode=require"
+            exit 1
+          fi
+
+          if ! printf '%s' "${{ secrets.RABBITMQ_URL }}" | grep -Eq '^amqp://.+'; then
+            echo "RABBITMQ_URL is not a valid AMQP connection string."
+            echo "Expected format: amqp://<username>:<password>@rabbitmq.messaging.svc.cluster.local:5672"
+            exit 1
+          fi
+
       - name: Create Kubernetes Secret (all service env vars)
         run: |
           kubectl create secret generic securestay-secrets \
