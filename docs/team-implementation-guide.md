@@ -11,6 +11,10 @@ It explains:
 - how to run automated tests
 - common troubleshooting steps
 
+Related reading:
+
+- See [errors_fix.md](./errors_fix.md) for the two-day deployment troubleshooting summary, root causes, solutions, lessons learned, and best practices.
+
 ## 1. What Is Implemented
 
 The project now includes a complete MVP backend + simple frontend:

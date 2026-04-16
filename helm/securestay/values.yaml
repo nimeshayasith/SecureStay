@@ -6,13 +6,25 @@ global:
 migration:
   enabled: true         # Run schema migration Job before service pods start
 
+frontend:
+  image: securestay/frontend
+  tag: "latest"
+  replicas: 1
+  port: 3000
+  service:
+    type: LoadBalancer
+    annotations: {}
+  resources:
+    requests: { cpu: "50m", memory: "64Mi" }
+    limits:   { cpu: "200m", memory: "128Mi" }
+
 apiGateway:
   image: securestay/api-gateway
   tag: "latest"
   replicas: 1
   port: 4000
   service:
-    type: LoadBalancer
+    type: ClusterIP
     annotations: {}
   resources:
     requests: { cpu: "100m", memory: "128Mi" }

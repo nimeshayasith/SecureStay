@@ -33,6 +33,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - service: frontend
+            context: ./frontend
           - service: api-gateway
             context: ./gateway
           - service: auth-service
@@ -113,7 +115,7 @@ jobs:
           kubectl delete pod -n ${{ env.NAMESPACE }} --field-selector=status.phase=Pending --ignore-not-found=true || true
           kubectl delete job/securestay-db-migrate -n ${{ env.NAMESPACE }} --ignore-not-found=true || true
           kubectl delete deployment/rabbitmq -n ${{ env.NAMESPACE }} --ignore-not-found=true || true
-          for svc in api-gateway auth-service booking-service payment-service notification-service; do
+          for svc in frontend api-gateway auth-service booking-service payment-service notification-service; do
             kubectl scale deployment/${svc} -n ${{ env.NAMESPACE }} --replicas=0 || true
             kubectl delete rs -n ${{ env.NAMESPACE }} -l app=${svc} --ignore-not-found=true || true
           done
@@ -123,13 +125,13 @@ jobs:
         run: |
           TOTAL_ALLOCATABLE_PODS=$(kubectl get nodes -o jsonpath='{range .items[*]}{.status.allocatable.pods}{"\n"}{end}' | awk '{sum += $1} END {print sum+0}')
           ACTIVE_PODS=$(kubectl get pods -A --field-selector=status.phase!=Succeeded,status.phase!=Failed --no-headers 2>/dev/null | wc -l | tr -d ' ')
-          REQUIRED_NEW_PODS=6
+          REQUIRED_NEW_PODS=7
           FREE_POD_SLOTS=$((TOTAL_ALLOCATABLE_PODS - ACTIVE_PODS))
 
           echo "Total allocatable pod slots: ${TOTAL_ALLOCATABLE_PODS}"
           echo "Currently active pods: ${ACTIVE_PODS}"
           echo "Free pod slots: ${FREE_POD_SLOTS}"
-          echo "Required for this release: ${REQUIRED_NEW_PODS} (5 services + 1 migration job)"
+          echo "Required for this release: ${REQUIRED_NEW_PODS} (frontend + 5 services + 1 migration job)"
           kubectl get nodes -o custom-columns=NAME:.metadata.name,ALLOCATABLE_PODS:.status.allocatable.pods
 
           if [ "${FREE_POD_SLOTS}" -lt "${REQUIRED_NEW_PODS}" ]; then
@@ -149,6 +151,7 @@ jobs:
             --create-namespace \
             --timeout 10m \
             --set global.imageRegistry=${ECR} \
+            --set frontend.tag=${IMAGE_TAG} \
             --set apiGateway.tag=${IMAGE_TAG} \
             --set authService.tag=${IMAGE_TAG} \
             --set bookingService.tag=${IMAGE_TAG} \
@@ -158,7 +161,7 @@ jobs:
       - name: Verify ECR images exist before rollout checks
         run: |
           IMAGE_TAG=${{ needs.prepare.outputs.image_tag }}
-          for repo in api-gateway auth-service booking-service payment-service notification-service; do
+          for repo in frontend api-gateway auth-service booking-service payment-service notification-service; do
             aws ecr describe-images \
               --repository-name securestay/${repo} \
               --image-ids imageTag=${IMAGE_TAG} \
@@ -168,7 +171,7 @@ jobs:
 
       - name: Verify all rollouts are healthy
         run: |
-          for svc in api-gateway auth-service booking-service payment-service notification-service; do
+          for svc in frontend api-gateway auth-service booking-service payment-service notification-service; do
             if ! kubectl rollout status deployment/${svc} -n ${{ env.NAMESPACE }} --timeout=5m; then
               echo "Rollout failed for ${svc}. Collecting diagnostics..."
               kubectl describe deployment/${svc} -n ${{ env.NAMESPACE }} || true
@@ -208,10 +211,10 @@ jobs:
 
       - name: Show public endpoint
         run: |
-          echo "Waiting for api-gateway load balancer hostname..."
-          kubectl get svc api-gateway -n ${{ env.NAMESPACE }} \
+          echo "Waiting for frontend load balancer hostname..."
+          kubectl get svc frontend -n ${{ env.NAMESPACE }} \
             -o jsonpath='{.status.loadBalancer.ingress[0].hostname}{"\n"}' || true
-          kubectl get svc api-gateway -n ${{ env.NAMESPACE }} -o wide || true
+          kubectl get svc frontend -n ${{ env.NAMESPACE }} -o wide || true
 
       - name: Rollback on failure
         if: failure()

@@ -1,4 +1,4 @@
-const API_BASE_URL = "http://192.168.49.2:30080";
+const API_BASE_URL = "";
 
 const state = {
   token: localStorage.getItem("securestay_token") || "",

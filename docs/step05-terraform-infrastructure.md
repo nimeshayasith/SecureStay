@@ -4,6 +4,8 @@
 
 The `terraform/` directory contains a complete Infrastructure-as-Code setup that provisions the entire SecureStay cloud environment on AWS using Terraform (>= 1.5.0, AWS provider ~> 5.0).
 
+For a retrospective on the infrastructure and deployment issues faced during the final troubleshooting period, see [errors_fix.md](./errors_fix.md).
+
 ---
 
 ## Files overview
