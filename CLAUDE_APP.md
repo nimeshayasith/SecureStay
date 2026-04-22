@@ -12,7 +12,7 @@
 
 ## 1. Application Overview
 
-SecureStay is a cloud-native hotel booking system built as microservices. The application
+SecureStay is a cloud-native hotel booking system built as microservices. The application.
 is tested locally with `docker-compose`. This CLAUDE.md file describes exactly what needs
 to change, what needs to be created, and how the full CI/CD pipeline works.
 
