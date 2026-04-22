@@ -152,19 +152,74 @@ jobs:
         run: |
           TOTAL_ALLOCATABLE_PODS=$(kubectl get nodes -o jsonpath='{range .items[*]}{.status.allocatable.pods}{"\n"}{end}' | awk '{sum += $1} END {print sum+0}')
           ACTIVE_PODS=$(kubectl get pods -A --field-selector=status.phase!=Succeeded,status.phase!=Failed --no-headers 2>/dev/null | wc -l | tr -d ' ')
-          REQUIRED_NEW_PODS=7
+          TARGET_NAMESPACE_ACTIVE_PODS=$(kubectl get pods -n ${{ env.NAMESPACE }} --field-selector=status.phase!=Succeeded,status.phase!=Failed --no-headers 2>/dev/null | wc -l | tr -d ' ')
+          STEADY_STATE_APP_PODS=6
+          MIGRATION_HOOK_PODS=1
+          BASELINE_CLUSTER_PODS=$((ACTIVE_PODS - TARGET_NAMESPACE_ACTIVE_PODS))
+          REQUIRED_TOTAL_PODS=$((BASELINE_CLUSTER_PODS + STEADY_STATE_APP_PODS))
           FREE_POD_SLOTS=$((TOTAL_ALLOCATABLE_PODS - ACTIVE_PODS))
+          NODEGROUP_NAME=$(aws eks list-nodegroups --cluster-name ${{ env.CLUSTER_NAME }} --region ${{ env.AWS_REGION }} --query 'nodegroups[0]' --output text 2>/dev/null || true)
+          NODEGROUP_INSTANCE_TYPE=""
+          NODEGROUP_DESIRED_SIZE=""
+
+          if [ -n "${NODEGROUP_NAME}" ] && [ "${NODEGROUP_NAME}" != "None" ]; then
+            NODEGROUP_INSTANCE_TYPE=$(aws eks describe-nodegroup \
+              --cluster-name ${{ env.CLUSTER_NAME }} \
+              --nodegroup-name "${NODEGROUP_NAME}" \
+              --region ${{ env.AWS_REGION }} \
+              --query 'nodegroup.instanceTypes[0]' \
+              --output text 2>/dev/null || true)
+            NODEGROUP_DESIRED_SIZE=$(aws eks describe-nodegroup \
+              --cluster-name ${{ env.CLUSTER_NAME }} \
+              --nodegroup-name "${NODEGROUP_NAME}" \
+              --region ${{ env.AWS_REGION }} \
+              --query 'nodegroup.scalingConfig.desiredSize' \
+              --output text 2>/dev/null || true)
+          fi
 
           echo "Total allocatable pod slots: ${TOTAL_ALLOCATABLE_PODS}"
           echo "Currently active pods: ${ACTIVE_PODS}"
+          echo "Active pods in target namespace after cleanup: ${TARGET_NAMESPACE_ACTIVE_PODS}"
+          echo "Baseline non-app cluster pods: ${BASELINE_CLUSTER_PODS}"
           echo "Free pod slots: ${FREE_POD_SLOTS}"
-          echo "Required for this release: ${REQUIRED_NEW_PODS} (frontend + 5 services + 1 migration job)"
+          echo "Required steady-state app pods: ${STEADY_STATE_APP_PODS} (frontend + 5 services)"
+          echo "Migration hook pods at startup: ${MIGRATION_HOOK_PODS}"
+          echo "Required total cluster pods after deploy: ${REQUIRED_TOTAL_PODS}"
           kubectl get nodes -o custom-columns=NAME:.metadata.name,ALLOCATABLE_PODS:.status.allocatable.pods
 
-          if [ "${FREE_POD_SLOTS}" -lt "${REQUIRED_NEW_PODS}" ]; then
+          if [ -n "${NODEGROUP_NAME}" ] && [ "${NODEGROUP_NAME}" != "None" ]; then
+            echo "Managed node group: ${NODEGROUP_NAME} (desired=${NODEGROUP_DESIRED_SIZE}, instanceType=${NODEGROUP_INSTANCE_TYPE})"
+          fi
+
+          if [ "${TOTAL_ALLOCATABLE_PODS}" -lt "${REQUIRED_TOTAL_PODS}" ]; then
             echo "Cluster capacity is too small for this release."
-            echo "This EKS cluster does not currently have enough pod slots to run RabbitMQ plus all SecureStay services."
-            echo "You must either refresh the node group so the current pod-capacity settings take effect, or use larger / more nodes."
+            echo "This cluster cannot fit the existing baseline workloads plus the 6 steady-state SecureStay pods."
+            echo "The Helm chart already uses Recreate deployments, so this is a real steady-state capacity shortfall, not a rolling-update surge."
+            if [ "${NODEGROUP_INSTANCE_TYPE}" = "t3.micro" ]; then
+              echo "The current worker node group is still using t3.micro instances."
+              echo "Scale the node group out or replace it with larger nodes such as t3.small, then recycle the nodes so the intended pod-capacity settings take effect."
+            else
+              echo "Refresh the node group so the current pod-capacity settings take effect, or use larger / more nodes."
+            fi
+            kubectl get pods -A -o wide || true
+            exit 1
+          fi
+
+      - name: Preflight RabbitMQ readiness
+        run: |
+          if ! kubectl get service rabbitmq -n messaging >/dev/null 2>&1; then
+            echo "RabbitMQ service was not found in the messaging namespace."
+            echo "SecureStay services depend on RabbitMQ for booking, payment, and notification events."
+            exit 1
+          fi
+
+          READY_ENDPOINTS=$(kubectl get endpoints rabbitmq -n messaging -o jsonpath='{range .subsets[*].addresses[*]}{.ip}{"\n"}{end}' 2>/dev/null | wc -l | tr -d ' ')
+          if [ "${READY_ENDPOINTS:-0}" -lt 1 ]; then
+            echo "RabbitMQ is not ready. SecureStay services depend on it."
+            kubectl get service rabbitmq -n messaging -o wide || true
+            kubectl get endpoints rabbitmq -n messaging -o yaml || true
+            kubectl get pods -n messaging -o wide || true
+            kubectl describe pod -n messaging -l app.kubernetes.io/name=rabbitmq || true
             exit 1
           fi
 
