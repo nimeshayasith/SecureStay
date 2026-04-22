@@ -5,7 +5,7 @@
 > **Author role:** Senior DevOps / Cloud Engineer
 > **Runtime:** Docker + Kubernetes (AWS EKS)
 > **CI/CD:** GitHub Actions
-> **Image Registry:** AWS ECR (provisioned by infra pipeline)
+> **Image Registry:** AWS ECR (provisioned by infrsa pipeline)
 > **Deployment:** Helm chart — image tag updated and rolled out on every merge to `main`
 
 ---
