@@ -123,4 +123,5 @@ docker compose up --build -d
 ## 9. Where to read next
 
 - Full implementation guide: `docs/team-implementation-guide.md`
+- Windows + Minikube local Kubernetes guide: `docs/windows-minikube-local-run.md`
 - Step details: `docs/step01...`, `docs/step03...`, `docs/step04...`

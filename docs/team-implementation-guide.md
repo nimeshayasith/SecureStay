@@ -11,6 +11,8 @@ It explains:
 - how to run automated tests
 - common troubleshooting steps
 
+For Windows local Kubernetes setup with exact Minikube commands, see [windows-minikube-local-run.md](./windows-minikube-local-run.md).
+
 ## 1. What Is Implemented
 
 The project now includes a complete MVP backend + simple frontend:

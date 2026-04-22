@@ -23,6 +23,8 @@ const logoutBtn = document.getElementById("logoutBtn");
 const availabilityText = document.getElementById("availabilityText");
 const bookingText = document.getElementById("bookingText");
 const paymentText = document.getElementById("paymentText");
+const checkInInput = availabilityForm.elements.checkInDate;
+const checkOutInput = availabilityForm.elements.checkOutDate;
 
 function log(message, level = "ok") {
   const now = new Date().toLocaleTimeString();
@@ -40,6 +42,10 @@ function setAuthState() {
     authState.innerHTML = '<span class="auth-dot"></span> Not logged in';
     authState.classList.remove("logged");
   }
+}
+
+function hasValidStayDates(checkInDate, checkOutDate) {
+  return Boolean(checkInDate && checkOutDate) && new Date(checkOutDate) > new Date(checkInDate);
 }
 
 async function request(path, options = {}) {
@@ -129,14 +135,30 @@ availabilityForm.addEventListener("submit", async (event) => {
 
   const checkInDate = fd.get("checkInDate");
   const checkOutDate = fd.get("checkOutDate");
+  if (!hasValidStayDates(checkInDate, checkOutDate)) {
+    state.selectedRoom = null;
+    availabilityText.textContent = "Check-out date must be after check-in date.";
+    availabilityText.style.color = "var(--err)";
+    log("Availability check failed: check-out date must be after check-in date.", "err");
+    return;
+  }
   try {
-    const data = await request(`/api/bookings/availability?roomId=${roomId}&checkInDate=${checkInDate}&checkOutDate=${checkOutDate}`);
+    const query = new URLSearchParams({ roomId, checkInDate, checkOutDate }).toString();
+    const data = await request(`/api/bookings/availability?${query}`);
     availabilityText.textContent = data.available ? "✓ Room is available for your dates." : "✗ Room is not available for selected dates.";
     availabilityText.style.color = data.available ? "var(--ok)" : "var(--err)";
     state.selectedRoom = { roomId, checkInDate, checkOutDate };
     log(`Availability: ${data.available ? "available ✓" : "unavailable ✗"}.`);
   } catch (error) {
+    state.selectedRoom = null;
     log(`Availability check failed: ${error.message}`, "err");
+  }
+});
+
+checkInInput.addEventListener("change", () => {
+  checkOutInput.min = checkInInput.value;
+  if (checkOutInput.value && !hasValidStayDates(checkInInput.value, checkOutInput.value)) {
+    checkOutInput.value = "";
   }
 });
 
