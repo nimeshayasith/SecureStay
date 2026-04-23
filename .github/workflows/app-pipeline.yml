@@ -150,9 +150,17 @@ jobs:
 
       - name: Preflight cluster pod capacity
         run: |
+          count_active_non_terminating_pods() {
+            kubectl get pods "$@" \
+              --field-selector=status.phase!=Succeeded,status.phase!=Failed \
+              -o custom-columns=DELETING:.metadata.deletionTimestamp \
+              --no-headers 2>/dev/null \
+              | awk 'BEGIN {count=0} $1 == "<none>" {count++} END {print count+0}'
+          }
+
           TOTAL_ALLOCATABLE_PODS=$(kubectl get nodes -o jsonpath='{range .items[*]}{.status.allocatable.pods}{"\n"}{end}' | awk '{sum += $1} END {print sum+0}')
-          ACTIVE_PODS=$(kubectl get pods -A --field-selector=status.phase!=Succeeded,status.phase!=Failed --no-headers 2>/dev/null | wc -l | tr -d ' ')
-          TARGET_NAMESPACE_ACTIVE_PODS=$(kubectl get pods -n ${{ env.NAMESPACE }} --field-selector=status.phase!=Succeeded,status.phase!=Failed --no-headers 2>/dev/null | wc -l | tr -d ' ')
+          ACTIVE_PODS=$(count_active_non_terminating_pods -A)
+          TARGET_NAMESPACE_ACTIVE_PODS=$(count_active_non_terminating_pods -n ${{ env.NAMESPACE }})
           STEADY_STATE_APP_PODS=6
           MIGRATION_HOOK_PODS=1
           BASELINE_CLUSTER_PODS=$((ACTIVE_PODS - TARGET_NAMESPACE_ACTIVE_PODS))
@@ -178,7 +186,7 @@ jobs:
           fi
 
           echo "Total allocatable pod slots: ${TOTAL_ALLOCATABLE_PODS}"
-          echo "Currently active pods: ${ACTIVE_PODS}"
+          echo "Currently active non-terminating pods: ${ACTIVE_PODS}"
           echo "Active pods in target namespace after cleanup: ${TARGET_NAMESPACE_ACTIVE_PODS}"
           echo "Baseline non-app cluster pods: ${BASELINE_CLUSTER_PODS}"
           echo "Free pod slots: ${FREE_POD_SLOTS}"
