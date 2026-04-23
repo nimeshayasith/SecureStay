@@ -12,8 +12,21 @@ const useSslForDatabase =
   process.env.DATABASE_URL &&
   (process.env.DATABASE_URL.includes("sslmode=require") ||
     process.env.NODE_ENV === "production");
+
+function getDatabaseUrl() {
+  if (!process.env.DATABASE_URL) return undefined;
+
+  try {
+    const url = new URL(process.env.DATABASE_URL);
+    url.searchParams.delete("sslmode");
+    return url.toString();
+  } catch (_error) {
+    return process.env.DATABASE_URL;
+  }
+}
+
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: getDatabaseUrl(),
   ssl: useSslForDatabase ? { rejectUnauthorized: false } : undefined
 });
 const jwtSecret = process.env.JWT_SECRET || "securestay-dev-secret";
