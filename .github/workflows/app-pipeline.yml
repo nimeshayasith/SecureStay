@@ -115,13 +115,21 @@ jobs:
 
       - name: Validate required secret formats
         run: |
-          if ! printf '%s' "${{ secrets.DATABASE_URL }}" | grep -Eq '^postgres(ql)?://.+:.+@.+/.+'; then
+          DATABASE_URL="$(printf '%s' "${{ secrets.DATABASE_URL }}" | tr -d '\r\n' | sed 's/sslmode=no-verify/sslmode=require/g')"
+          RABBITMQ_URL="$(printf '%s' "${{ secrets.RABBITMQ_URL }}" | tr -d '\r\n')"
+
+          if ! printf '%s' "$DATABASE_URL" | grep -Eq '^postgres(ql)?://.+:.+@.+/.+'; then
             echo "DATABASE_URL is not a full PostgreSQL connection string."
             echo "Expected format: postgresql://<username>:<password>@<host>:5432/<database>?sslmode=require"
             exit 1
           fi
 
-          if ! printf '%s' "${{ secrets.RABBITMQ_URL }}" | grep -Eq '^amqp://.+'; then
+          if ! printf '%s' "$DATABASE_URL" | grep -Eq '(\?|&)sslmode=require($|&)'; then
+            echo "DATABASE_URL must include sslmode=require for AWS RDS."
+            exit 1
+          fi
+
+          if ! printf '%s' "$RABBITMQ_URL" | grep -Eq '^amqp://.+'; then
             echo "RABBITMQ_URL is not a valid AMQP connection string."
             echo "Expected format: amqp://<username>:<password>@rabbitmq.messaging.svc.cluster.local:5672"
             exit 1
@@ -129,11 +137,14 @@ jobs:
 
       - name: Create Kubernetes Secret (all service env vars)
         run: |
+          DATABASE_URL="$(printf '%s' "${{ secrets.DATABASE_URL }}" | tr -d '\r\n' | sed 's/sslmode=no-verify/sslmode=require/g')"
+          RABBITMQ_URL="$(printf '%s' "${{ secrets.RABBITMQ_URL }}" | tr -d '\r\n')"
+
           kubectl create secret generic securestay-secrets \
             --namespace=${{ env.NAMESPACE }} \
-            --from-literal=database-url="${{ secrets.DATABASE_URL }}" \
+            --from-literal=database-url="$DATABASE_URL" \
             --from-literal=jwt-secret="${{ secrets.JWT_SECRET }}" \
-            --from-literal=rabbitmq-url="${{ secrets.RABBITMQ_URL }}" \
+            --from-literal=rabbitmq-url="$RABBITMQ_URL" \
             --from-literal=payment-secret="${{ secrets.PAYMENT_SECRET }}" \
             --dry-run=client -o yaml | kubectl apply -f -
 
