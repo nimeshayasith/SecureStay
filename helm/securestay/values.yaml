@@ -1,0 +1,75 @@
+global:
+  imageRegistry: ""     # Overridden at deploy time: <account>.dkr.ecr.us-east-1.amazonaws.com
+  imagePullPolicy: Always
+  namespace: securestay
+
+migration:
+  enabled: true         # Run schema migration Job before service pods start
+
+frontend:
+  image: securestay/frontend
+  tag: "latest"
+  replicas: 1
+  port: 3000
+  service:
+    type: LoadBalancer
+    annotations: {}
+  resources:
+    requests: { cpu: "50m", memory: "64Mi" }
+    limits:   { cpu: "200m", memory: "128Mi" }
+
+apiGateway:
+  image: securestay/api-gateway
+  tag: "latest"
+  replicas: 1
+  port: 4000
+  service:
+    type: ClusterIP
+    annotations: {}
+  resources:
+    requests: { cpu: "100m", memory: "128Mi" }
+    limits:   { cpu: "500m", memory: "256Mi" }
+
+authService:
+  image: securestay/auth-service
+  tag: "latest"
+  replicas: 1
+  port: 4001
+  resources:
+    requests: { cpu: "100m", memory: "128Mi" }
+    limits:   { cpu: "500m", memory: "256Mi" }
+
+bookingService:
+  image: securestay/booking-service
+  tag: "latest"
+  replicas: 1
+  port: 4002
+  resources:
+    requests: { cpu: "100m", memory: "128Mi" }
+    limits:   { cpu: "500m", memory: "256Mi" }
+
+paymentService:
+  image: securestay/payment-service
+  tag: "latest"
+  replicas: 1
+  port: 4003
+  resources:
+    requests: { cpu: "100m", memory: "128Mi" }
+    limits:   { cpu: "500m", memory: "256Mi" }
+
+notificationService:
+  image: securestay/notification-service
+  tag: "latest"
+  replicas: 1             # Single consumer — one pod reads from RabbitMQ queue
+  port: 4004
+  resources:
+    requests: { cpu: "50m",  memory: "64Mi" }
+    limits:   { cpu: "200m", memory: "128Mi" }
+
+ingress:
+  enabled: false
+  className: nginx
+  host: app.securestay.com
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"

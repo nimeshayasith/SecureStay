@@ -1,0 +1,67 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: payment-service
+spec:
+  ports:
+    - port: 4003
+  selector:
+    app: payment-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payment-service
+  template:
+    metadata:
+      labels:
+        app: payment-service
+    spec:
+      containers:
+        - name: payment-service
+          image: lasindu123/payment-service:1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 4003
+          env:
+            - name: PORT
+              value: "4003"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: securestay-secrets
+                  key: database-url
+            # FIX: was missing — service defaulted to http://localhost:4002 (broken in K8s)
+            - name: BOOKING_SERVICE_INTERNAL_URL
+              valueFrom:
+                secretKeyRef:
+                  name: securestay-secrets
+                  key: booking-service-internal-url
+            # FIX: JWT_SECRET was missing
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: securestay-secrets
+                  key: jwt-secret
+            - name: RABBITMQ_URL
+              valueFrom:
+                secretKeyRef:
+                  name: securestay-secrets
+                  key: rabbitmq-url
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 4003
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 4003
+            initialDelaySeconds: 20
+            periodSeconds: 20

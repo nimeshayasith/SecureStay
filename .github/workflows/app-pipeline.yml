@@ -1,0 +1,335 @@
+name: "App Pipeline - Build -> Push -> Deploy"
+
+on:
+  push:
+    branches: [aws_cloud]
+
+env:
+  AWS_REGION: us-east-1
+  CLUSTER_NAME: securestay-eks
+  NAMESPACE: securestay
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  prepare:
+    name: "Prepare release metadata"
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.tag.outputs.version }}
+
+    steps:
+      - name: Generate image tag
+        id: tag
+        run: |
+          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+          TIMESTAMP=$(date +%Y%m%d%H%M%S)
+          echo "version=${TIMESTAMP}-${SHORT_SHA}" >> $GITHUB_OUTPUT
+
+  build-and-push:
+    needs: prepare
+    name: "Build & Push - ${{ matrix.service }}"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: frontend
+            context: ./frontend
+          - service: api-gateway
+            context: ./gateway
+          - service: auth-service
+            context: ./services/auth-service
+          - service: booking-service
+            context: ./services/booking-service
+          - service: payment-service
+            context: ./services/payment-service
+          - service: notification-service
+            context: ./services/notification-service
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: aws-actions/configure-aws-credentials@v4.0.2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: aws-actions/amazon-ecr-login@v2.0.1
+        id: login-ecr
+
+      - name: Ensure ECR repository exists
+        run: |
+          REPOSITORY="securestay/${{ matrix.service }}"
+          if aws ecr describe-repositories --repository-names "${REPOSITORY}" --region ${{ env.AWS_REGION }} >/dev/null 2>&1; then
+            echo "ECR repository ${REPOSITORY} already exists"
+          else
+            echo "Creating ECR repository ${REPOSITORY}"
+            aws ecr create-repository \
+              --repository-name "${REPOSITORY}" \
+              --region ${{ env.AWS_REGION }} \
+              --image-scanning-configuration scanOnPush=true
+          fi
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/securestay/${{ matrix.service }}:${{ needs.prepare.outputs.image_tag }}
+            ${{ steps.login-ecr.outputs.registry }}/securestay/${{ matrix.service }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: "Deploy to EKS via Helm"
+    needs: [prepare, build-and-push]
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - uses: aws-actions/configure-aws-credentials@v4.0.2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: aws-actions/amazon-ecr-login@v2.0.1
+        id: login-ecr
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.CLUSTER_NAME }}
+
+      - uses: azure/setup-helm@v4
+        with:
+          version: "3.14.0"
+
+      - name: Create namespace
+        run: |
+          kubectl create namespace ${{ env.NAMESPACE }} --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Validate required secret formats
+        run: |
+          DATABASE_URL="$(printf '%s' "${{ secrets.DATABASE_URL }}" | tr -d '\r\n' | sed 's/sslmode=no-verify/sslmode=require/g')"
+          RABBITMQ_URL="$(printf '%s' "${{ secrets.RABBITMQ_URL }}" | tr -d '\r\n')"
+
+          if ! printf '%s' "$DATABASE_URL" | grep -Eq '^postgres(ql)?://.+:.+@.+/.+'; then
+            echo "DATABASE_URL is not a full PostgreSQL connection string."
+            echo "Expected format: postgresql://<username>:<password>@<host>:5432/<database>?sslmode=require"
+            exit 1
+          fi
+
+          if ! printf '%s' "$DATABASE_URL" | grep -Eq '(\?|&)sslmode=require($|&)'; then
+            echo "DATABASE_URL must include sslmode=require for AWS RDS."
+            exit 1
+          fi
+
+          if ! printf '%s' "$RABBITMQ_URL" | grep -Eq '^amqp://.+'; then
+            echo "RABBITMQ_URL is not a valid AMQP connection string."
+            echo "Expected format: amqp://<username>:<password>@rabbitmq.messaging.svc.cluster.local:5672"
+            exit 1
+          fi
+
+      - name: Create Kubernetes Secret (all service env vars)
+        run: |
+          DATABASE_URL="$(printf '%s' "${{ secrets.DATABASE_URL }}" | tr -d '\r\n' | sed 's/sslmode=no-verify/sslmode=require/g')"
+          RABBITMQ_URL="$(printf '%s' "${{ secrets.RABBITMQ_URL }}" | tr -d '\r\n')"
+
+          kubectl create secret generic securestay-secrets \
+            --namespace=${{ env.NAMESPACE }} \
+            --from-literal=database-url="$DATABASE_URL" \
+            --from-literal=jwt-secret="${{ secrets.JWT_SECRET }}" \
+            --from-literal=rabbitmq-url="$RABBITMQ_URL" \
+            --from-literal=payment-secret="${{ secrets.PAYMENT_SECRET }}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Clean up unschedulable pods from previous failed rollouts
+        run: |
+          kubectl delete pod -n ${{ env.NAMESPACE }} --field-selector=status.phase=Pending --ignore-not-found=true || true
+          kubectl delete job/securestay-db-migrate -n ${{ env.NAMESPACE }} --ignore-not-found=true || true
+          kubectl delete deployment/rabbitmq -n ${{ env.NAMESPACE }} --ignore-not-found=true || true
+          for svc in frontend api-gateway auth-service booking-service payment-service notification-service; do
+            kubectl scale deployment/${svc} -n ${{ env.NAMESPACE }} --replicas=0 || true
+            kubectl delete rs -n ${{ env.NAMESPACE }} -l app=${svc} --ignore-not-found=true || true
+          done
+          kubectl get pods -n ${{ env.NAMESPACE }} || true
+
+      - name: Preflight cluster pod capacity
+        run: |
+          count_active_non_terminating_pods() {
+            kubectl get pods "$@" \
+              --field-selector=status.phase!=Succeeded,status.phase!=Failed \
+              -o custom-columns=DELETING:.metadata.deletionTimestamp \
+              --no-headers 2>/dev/null \
+              | awk 'BEGIN {count=0} $1 == "<none>" {count++} END {print count+0}'
+          }
+
+          TOTAL_ALLOCATABLE_PODS=$(kubectl get nodes -o jsonpath='{range .items[*]}{.status.allocatable.pods}{"\n"}{end}' | awk '{sum += $1} END {print sum+0}')
+          ACTIVE_PODS=$(count_active_non_terminating_pods -A)
+          TARGET_NAMESPACE_ACTIVE_PODS=$(count_active_non_terminating_pods -n ${{ env.NAMESPACE }})
+          STEADY_STATE_APP_PODS=6
+          MIGRATION_HOOK_PODS=1
+          BASELINE_CLUSTER_PODS=$((ACTIVE_PODS - TARGET_NAMESPACE_ACTIVE_PODS))
+          REQUIRED_TOTAL_PODS=$((BASELINE_CLUSTER_PODS + STEADY_STATE_APP_PODS))
+          FREE_POD_SLOTS=$((TOTAL_ALLOCATABLE_PODS - ACTIVE_PODS))
+          NODEGROUP_NAME=$(aws eks list-nodegroups --cluster-name ${{ env.CLUSTER_NAME }} --region ${{ env.AWS_REGION }} --query 'nodegroups[0]' --output text 2>/dev/null || true)
+          NODEGROUP_INSTANCE_TYPE=""
+          NODEGROUP_DESIRED_SIZE=""
+
+          if [ -n "${NODEGROUP_NAME}" ] && [ "${NODEGROUP_NAME}" != "None" ]; then
+            NODEGROUP_INSTANCE_TYPE=$(aws eks describe-nodegroup \
+              --cluster-name ${{ env.CLUSTER_NAME }} \
+              --nodegroup-name "${NODEGROUP_NAME}" \
+              --region ${{ env.AWS_REGION }} \
+              --query 'nodegroup.instanceTypes[0]' \
+              --output text 2>/dev/null || true)
+            NODEGROUP_DESIRED_SIZE=$(aws eks describe-nodegroup \
+              --cluster-name ${{ env.CLUSTER_NAME }} \
+              --nodegroup-name "${NODEGROUP_NAME}" \
+              --region ${{ env.AWS_REGION }} \
+              --query 'nodegroup.scalingConfig.desiredSize' \
+              --output text 2>/dev/null || true)
+          fi
+
+          echo "Total allocatable pod slots: ${TOTAL_ALLOCATABLE_PODS}"
+          echo "Currently active non-terminating pods: ${ACTIVE_PODS}"
+          echo "Active pods in target namespace after cleanup: ${TARGET_NAMESPACE_ACTIVE_PODS}"
+          echo "Baseline non-app cluster pods: ${BASELINE_CLUSTER_PODS}"
+          echo "Free pod slots: ${FREE_POD_SLOTS}"
+          echo "Required steady-state app pods: ${STEADY_STATE_APP_PODS} (frontend + 5 services)"
+          echo "Migration hook pods at startup: ${MIGRATION_HOOK_PODS}"
+          echo "Required total cluster pods after deploy: ${REQUIRED_TOTAL_PODS}"
+          kubectl get nodes -o custom-columns=NAME:.metadata.name,ALLOCATABLE_PODS:.status.allocatable.pods
+
+          if [ -n "${NODEGROUP_NAME}" ] && [ "${NODEGROUP_NAME}" != "None" ]; then
+            echo "Managed node group: ${NODEGROUP_NAME} (desired=${NODEGROUP_DESIRED_SIZE}, instanceType=${NODEGROUP_INSTANCE_TYPE})"
+          fi
+
+          if [ "${TOTAL_ALLOCATABLE_PODS}" -lt "${REQUIRED_TOTAL_PODS}" ]; then
+            echo "Cluster capacity is too small for this release."
+            echo "This cluster cannot fit the existing baseline workloads plus the 6 steady-state SecureStay pods."
+            echo "The Helm chart already uses Recreate deployments, so this is a real steady-state capacity shortfall, not a rolling-update surge."
+            if [ "${NODEGROUP_INSTANCE_TYPE}" = "t3.micro" ]; then
+              echo "The current worker node group is still using t3.micro instances."
+              echo "Scale the node group out or replace it with larger nodes such as t3.small, then recycle the nodes so the intended pod-capacity settings take effect."
+            else
+              echo "Refresh the node group so the current pod-capacity settings take effect, or use larger / more nodes."
+            fi
+            kubectl get pods -A -o wide || true
+            exit 1
+          fi
+
+      - name: Preflight RabbitMQ readiness
+        run: |
+          if ! kubectl get service rabbitmq -n messaging >/dev/null 2>&1; then
+            echo "RabbitMQ service was not found in the messaging namespace."
+            echo "SecureStay services depend on RabbitMQ for booking, payment, and notification events."
+            exit 1
+          fi
+
+          READY_ENDPOINTS=$(kubectl get endpoints rabbitmq -n messaging -o jsonpath='{range .subsets[*].addresses[*]}{.ip}{"\n"}{end}' 2>/dev/null | wc -l | tr -d ' ')
+          if [ "${READY_ENDPOINTS:-0}" -lt 1 ]; then
+            echo "RabbitMQ is not ready. SecureStay services depend on it."
+            kubectl get service rabbitmq -n messaging -o wide || true
+            kubectl get endpoints rabbitmq -n messaging -o yaml || true
+            kubectl get pods -n messaging -o wide || true
+            kubectl describe pod -n messaging -l app.kubernetes.io/name=rabbitmq || true
+            exit 1
+          fi
+
+      - name: Helm upgrade - deploy all services with new image tag
+        run: |
+          IMAGE_TAG=${{ needs.prepare.outputs.image_tag }}
+          ECR=${{ steps.login-ecr.outputs.registry }}
+
+          helm upgrade --install securestay ./helm/securestay \
+            --namespace ${{ env.NAMESPACE }} \
+            --create-namespace \
+            --timeout 10m \
+            --set global.imageRegistry=${ECR} \
+            --set frontend.tag=${IMAGE_TAG} \
+            --set apiGateway.tag=${IMAGE_TAG} \
+            --set authService.tag=${IMAGE_TAG} \
+            --set bookingService.tag=${IMAGE_TAG} \
+            --set paymentService.tag=${IMAGE_TAG} \
+            --set notificationService.tag=${IMAGE_TAG}
+
+      - name: Verify ECR images exist before rollout checks
+        run: |
+          IMAGE_TAG=${{ needs.prepare.outputs.image_tag }}
+          for repo in frontend api-gateway auth-service booking-service payment-service notification-service; do
+            aws ecr describe-images \
+              --repository-name securestay/${repo} \
+              --image-ids imageTag=${IMAGE_TAG} \
+              --region ${{ env.AWS_REGION }} >/dev/null
+            echo "Verified securestay/${repo}:${IMAGE_TAG} exists in ECR"
+          done
+
+      - name: Verify all rollouts are healthy
+        run: |
+          for svc in frontend api-gateway auth-service booking-service payment-service notification-service; do
+            if ! kubectl rollout status deployment/${svc} -n ${{ env.NAMESPACE }} --timeout=5m; then
+              echo "Rollout failed for ${svc}. Collecting diagnostics..."
+              kubectl describe deployment/${svc} -n ${{ env.NAMESPACE }} || true
+              kubectl get pods -n ${{ env.NAMESPACE }} -l app=${svc} -o wide || true
+              kubectl describe pods -n ${{ env.NAMESPACE }} -l app=${svc} || true
+              kubectl logs -n ${{ env.NAMESPACE }} -l app=${svc} --all-containers=true --tail=200 || true
+              exit 1
+            fi
+            echo "${svc} is running"
+          done
+
+      - name: Show diagnostics on failure
+        if: failure()
+        run: |
+          kubectl get all -n ${{ env.NAMESPACE }} || true
+          kubectl get events -n ${{ env.NAMESPACE }} --sort-by=.lastTimestamp || true
+          kubectl get jobs -n ${{ env.NAMESPACE }} || true
+          if kubectl get job/securestay-db-migrate -n ${{ env.NAMESPACE }} >/dev/null 2>&1; then
+            kubectl describe job/securestay-db-migrate -n ${{ env.NAMESPACE }} || true
+            kubectl logs job/securestay-db-migrate -n ${{ env.NAMESPACE }} --all-containers=true || true
+          else
+            echo "Migration hook job is not present. It may have been deleted after success."
+          fi
+
+      - name: Confirm notification-service uses PostgreSQL (not MongoDB)
+        run: |
+          echo "Checking notification-service env vars:"
+          kubectl get deployment notification-service -n ${{ env.NAMESPACE }} \
+            -o jsonpath='{.spec.template.spec.containers[0].env}' | grep -v MONGODB || true
+          echo "MONGODB_URL must NOT appear above. DATABASE_URL is used instead."
+
+      - name: Show running pods
+        run: kubectl get pods -n ${{ env.NAMESPACE }}
+
+      - name: Show services and ports
+        run: kubectl get svc -n ${{ env.NAMESPACE }}
+
+      - name: Show public endpoint
+        run: |
+          echo "Waiting for frontend load balancer hostname..."
+          kubectl get svc frontend -n ${{ env.NAMESPACE }} \
+            -o jsonpath='{.status.loadBalancer.ingress[0].hostname}{"\n"}' || true
+          kubectl get svc frontend -n ${{ env.NAMESPACE }} -o wide || true
+
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          echo "Deployment failed - checking for an existing Helm release"
+          if helm status securestay --namespace ${{ env.NAMESPACE }} >/dev/null 2>&1; then
+            REVISION_COUNT=$(helm history securestay --namespace ${{ env.NAMESPACE }} 2>/dev/null | tail -n +2 | wc -l | tr -d ' ')
+            if [ "${REVISION_COUNT}" -ge 2 ]; then
+              echo "Existing release has prior revisions - rolling back"
+              helm rollback securestay --namespace ${{ env.NAMESPACE }}
+            else
+              echo "Release has no previous revision - uninstalling failed release"
+              helm uninstall securestay --namespace ${{ env.NAMESPACE }} || true
+            fi
+          else
+            echo "No existing Helm release found - skipping rollback"
+          fi

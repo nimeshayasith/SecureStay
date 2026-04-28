@@ -1,0 +1,43 @@
+name: "PR Check — Build & Lint"
+
+on:
+  pull_request:
+    branches: [aws_cloud]
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  build-check:
+    name: "Build — ${{ matrix.service }}"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: api-gateway
+            context: ./gateway
+          - service: auth-service
+            context: ./services/auth-service
+          - service: booking-service
+            context: ./services/booking-service
+          - service: payment-service
+            context: ./services/payment-service
+          - service: notification-service
+            context: ./services/notification-service
+
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - name: Build Docker image (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          push: false
+          tags: securestay/${{ matrix.service }}:pr-check
+
+      - name: Lint
+        working-directory: ${{ matrix.context }}
+        run: |
+          npm ci --silent
+          npm run lint --if-present

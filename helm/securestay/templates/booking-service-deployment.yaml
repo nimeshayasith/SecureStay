@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: booking-service
+  namespace: {{ .Values.global.namespace }}
+spec:
+  replicas: {{ .Values.bookingService.replicas }}
+  revisionHistoryLimit: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: booking-service
+  template:
+    metadata:
+      labels:
+        app: booking-service
+    spec:
+      containers:
+        - name: booking-service
+          image: "{{ .Values.global.imageRegistry }}/{{ .Values.bookingService.image }}:{{ .Values.bookingService.tag }}"
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - containerPort: {{ .Values.bookingService.port }}
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: securestay-secrets
+                  key: database-url
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: securestay-secrets
+                  key: jwt-secret
+            - name: RABBITMQ_URL
+              valueFrom:
+                secretKeyRef:
+                  name: securestay-secrets
+                  key: rabbitmq-url
+            - name: PORT
+              value: "{{ .Values.bookingService.port }}"
+            - name: NODE_ENV
+              value: "production"
+          resources:
+            {{- toYaml .Values.bookingService.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.bookingService.port }}
+            initialDelaySeconds: 15
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.bookingService.port }}
+            initialDelaySeconds: 30
+            periodSeconds: 10

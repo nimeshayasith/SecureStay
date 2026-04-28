@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: {{ .Values.global.namespace }}
+spec:
+  replicas: {{ .Values.apiGateway.replicas }}
+  revisionHistoryLimit: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: api-gateway
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+    spec:
+      containers:
+        - name: api-gateway
+          image: "{{ .Values.global.imageRegistry }}/{{ .Values.apiGateway.image }}:{{ .Values.apiGateway.tag }}"
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - containerPort: {{ .Values.apiGateway.port }}
+          env:
+            - name: PORT
+              value: "{{ .Values.apiGateway.port }}"
+            - name: NODE_ENV
+              value: "production"
+            - name: AUTH_SERVICE_URL
+              value: "http://auth-service:{{ .Values.authService.port }}"
+            - name: BOOKING_SERVICE_URL
+              value: "http://booking-service:{{ .Values.bookingService.port }}"
+            - name: PAYMENT_SERVICE_URL
+              value: "http://payment-service:{{ .Values.paymentService.port }}"
+            - name: NOTIFICATION_SERVICE_URL
+              value: "http://notification-service:{{ .Values.notificationService.port }}"
+          resources:
+            {{- toYaml .Values.apiGateway.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.apiGateway.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.apiGateway.port }}
+            initialDelaySeconds: 20
+            periodSeconds: 10

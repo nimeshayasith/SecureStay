@@ -1,4 +1,16 @@
+# Kubernetes tools (DO NOT TRACK)
+k8s/minikube-linux-amd64
+k8s/kubectl
+
+# OS / binaries
+*.exe
+*.bin
+
+# dependencies
 node_modules/
-.env
+
+# logs
 *.log
-.DS_Store
+
+# environment files
+.env

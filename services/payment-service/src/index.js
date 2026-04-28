@@ -8,38 +8,80 @@ const { Pool } = require("pg");
 
 const app = express();
 const port = Number(process.env.PORT || 4003);
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-const jwtSecret = process.env.JWT_SECRET || "securestay-dev-secret";
-const bookingServiceInternalUrl = process.env.BOOKING_SERVICE_INTERNAL_URL || "http://localhost:4002";
+const useSslForDatabase =
+  process.env.DATABASE_URL &&
+  (process.env.DATABASE_URL.includes("sslmode=require") ||
+    process.env.NODE_ENV === "production");
 
-const rabbitmqUrl = process.env.RABBITMQ_URL || "amqp://localhost:5672";
-const paymentEventsExchange = process.env.PAYMENT_EVENTS_EXCHANGE || "securestay.events";
+function getDatabaseUrl() {
+  if (!process.env.DATABASE_URL) return undefined;
+
+  try {
+    const url = new URL(process.env.DATABASE_URL);
+    url.searchParams.delete("sslmode");
+    return url.toString();
+  } catch (_error) {
+    return process.env.DATABASE_URL;
+  }
+}
+
+const pool = new Pool({
+  connectionString: getDatabaseUrl(),
+  ssl: useSslForDatabase ? { rejectUnauthorized: false } : undefined
+});
+const jwtSecret = process.env.JWT_SECRET || "securestay-dev-secret";
+const bookingServiceInternalUrl =
+  process.env.BOOKING_SERVICE_INTERNAL_URL || "http://localhost:4002";
+
+const rabbitmqUrl =
+  process.env.RABBITMQ_URL || "amqp://rabbitmq.messaging.svc.cluster.local:5672";
+const paymentEventsExchange =
+  process.env.PAYMENT_EVENTS_EXCHANGE || "securestay.events";
 let eventChannel;
 
 app.use(express.json());
 
-async function initRabbitMq() {
-  try {
-    const connection = await amqp.connect(rabbitmqUrl);
-    eventChannel = await connection.createChannel();
-    await eventChannel.assertExchange(paymentEventsExchange, "topic", { durable: true });
-    console.log("Payment service connected to RabbitMQ");
-  } catch (error) {
-    console.error("Payment service RabbitMQ init failed", error.message);
+// FIX: added retry loop identical to booking-service so RabbitMQ startup
+// race conditions don't silently drop all payment events forever
+async function initRabbitMq(retries = 10) {
+  while (retries > 0) {
+    try {
+      const connection = await amqp.connect(rabbitmqUrl);
+      eventChannel = await connection.createChannel();
+      await eventChannel.assertExchange(paymentEventsExchange, "topic", {
+        durable: true
+      });
+      console.log("Payment service connected to RabbitMQ");
+      return;
+    } catch (error) {
+      console.error(
+        "Payment service RabbitMQ connection failed, retrying...",
+        error.message
+      );
+      retries--;
+      await new Promise((r) => setTimeout(r, 3000));
+    }
   }
+  console.error("Payment service RabbitMQ connection failed permanently");
 }
 
 async function publishEvent(routingKey, payload) {
   if (!eventChannel) {
+    console.error("RabbitMQ channel not ready. Event dropped:", routingKey);
     return;
   }
 
-  eventChannel.publish(
-    paymentEventsExchange,
-    routingKey,
-    Buffer.from(JSON.stringify(payload)),
-    { contentType: "application/json", persistent: true }
-  );
+  try {
+    eventChannel.publish(
+      paymentEventsExchange,
+      routingKey,
+      Buffer.from(JSON.stringify(payload)),
+      { contentType: "application/json", persistent: true }
+    );
+    console.log("Event published:", routingKey);
+  } catch (err) {
+    console.error("Failed to publish event:", err.message);
+  }
 }
 
 function authMiddleware(req, res, next) {
@@ -79,12 +121,17 @@ function mapPayment(row) {
 }
 
 async function getBooking(bookingId) {
-  const response = await axios.get(`${bookingServiceInternalUrl}/internal/bookings/${bookingId}`);
+  const response = await axios.get(
+    `${bookingServiceInternalUrl}/internal/bookings/${bookingId}`
+  );
   return response.data;
 }
 
 async function updateBookingStatus(bookingId, status) {
-  await axios.patch(`${bookingServiceInternalUrl}/internal/bookings/${bookingId}/status`, { status });
+  await axios.patch(
+    `${bookingServiceInternalUrl}/internal/bookings/${bookingId}/status`,
+    { status }
+  );
 }
 
 app.get("/health", (_req, res) => {
@@ -117,9 +164,14 @@ app.post("/api/payments/", authMiddleware, async (req, res) => {
   }
 
   try {
-    const existingPayment = await pool.query("SELECT id FROM payments WHERE booking_id = $1", [bookingId]);
+    const existingPayment = await pool.query(
+      "SELECT id FROM payments WHERE booking_id = $1",
+      [bookingId]
+    );
     if (existingPayment.rowCount > 0) {
-      return res.status(400).json({ message: "Payment already exists for booking" });
+      return res
+        .status(400)
+        .json({ message: "Payment already exists for booking" });
     }
 
     let booking;
@@ -137,7 +189,9 @@ app.post("/api/payments/", authMiddleware, async (req, res) => {
     }
 
     if (Number(amount) !== Number(booking.totalAmount)) {
-      return res.status(400).json({ message: "Payment amount does not match booking total" });
+      return res
+        .status(400)
+        .json({ message: "Payment amount does not match booking total" });
     }
 
     const paymentSucceeded = String(cvv) !== "000";
@@ -146,16 +200,12 @@ app.post("/api/payments/", authMiddleware, async (req, res) => {
 
     const created = await pool.query(
       `INSERT INTO payments (
-         booking_id,
-         amount,
-         payment_method,
-         transaction_reference,
-         status,
-         masked_card_number,
-         processed_at
+         booking_id, amount, payment_method, transaction_reference,
+         status, masked_card_number, processed_at
        )
        VALUES ($1, $2, $3, $4, $5, $6, NOW())
-       RETURNING id, booking_id, amount, currency, payment_method, transaction_reference, status, masked_card_number, processed_at`,
+       RETURNING id, booking_id, amount, currency, payment_method,
+                 transaction_reference, status, masked_card_number, processed_at`,
       [
         bookingId,
         amount,
@@ -187,7 +237,8 @@ app.post("/api/payments/", authMiddleware, async (req, res) => {
 app.get("/api/payments/:paymentId", authMiddleware, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT id, booking_id, amount, currency, payment_method, transaction_reference, status, masked_card_number, processed_at
+      `SELECT id, booking_id, amount, currency, payment_method,
+              transaction_reference, status, masked_card_number, processed_at
        FROM payments
        WHERE id = $1`,
       [req.params.paymentId]
@@ -204,8 +255,13 @@ app.get("/api/payments/:paymentId", authMiddleware, async (req, res) => {
   }
 });
 
-initRabbitMq().then(() => {
+// FIX: use startService pattern (same as booking-service) so RabbitMQ
+// retry completes before the HTTP server starts accepting requests
+async function startService() {
+  await initRabbitMq();
   app.listen(port, () => {
     console.log(`Payment service listening on port ${port}`);
   });
-});
+}
+
+startService();

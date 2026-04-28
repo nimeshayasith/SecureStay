@@ -7,12 +7,35 @@ const { Pool } = require("pg");
 
 const app = express();
 const port = Number(process.env.PORT || 4001);
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+
+const useSslForDatabase =
+  process.env.DATABASE_URL &&
+  (process.env.DATABASE_URL.includes("sslmode=require") ||
+    process.env.NODE_ENV === "production");
+
+function getDatabaseUrl() {
+  if (!process.env.DATABASE_URL) return undefined;
+
+  try {
+    const url = new URL(process.env.DATABASE_URL);
+    url.searchParams.delete("sslmode");
+    return url.toString();
+  } catch (_error) {
+    return process.env.DATABASE_URL;
+  }
+}
+
+const pool = new Pool({
+  connectionString: getDatabaseUrl(),
+  ssl: useSslForDatabase ? { rejectUnauthorized: false } : undefined
+});
 
 const jwtSecret = process.env.JWT_SECRET || "securestay-dev-secret";
 const jwtExpiresIn = process.env.JWT_EXPIRES_IN || "1h";
 
 app.use(express.json());
+
+/* ---------------- Helpers ---------------- */
 
 function mapUser(row) {
   return {
@@ -36,67 +59,81 @@ function createAccessToken(user) {
   );
 }
 
+/* ---------------- Middleware ---------------- */
+
 function authMiddleware(req, res, next) {
   const authHeader = req.headers.authorization;
+
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return res.status(401).json({ message: "Missing or invalid token" });
   }
 
-  const token = authHeader.slice("Bearer ".length);
+  const token = authHeader.split(" ")[1];
+
   try {
     req.user = jwt.verify(token, jwtSecret);
-    return next();
-  } catch (_error) {
-    return res.status(401).json({ message: "Missing or invalid token" });
+    next();
+  } catch (err) {
+    return res.status(401).json({ message: "Invalid token" });
   }
 }
 
+/* ---------------- Routes (IMPORTANT: API PREFIX ADDED) ---------------- */
+
+// Health check
 app.get("/health", (_req, res) => {
-  res.status(200).json({ status: "ok", service: "auth-service" });
+  res.json({ status: "ok", service: "auth-service" });
 });
 
-app.post("/api/auth/register", async (req, res) => {
+// Register
+app.post("/register", async (req, res) => {
   const { fullName, email, password } = req.body || {};
 
   if (!fullName || !email || !password || password.length < 8) {
     return res.status(400).json({ message: "Invalid registration payload" });
   }
 
-  const normalizedEmail = String(email).toLowerCase().trim();
+  const normalizedEmail = email.toLowerCase().trim();
 
   try {
-    const existing = await pool.query("SELECT id FROM users WHERE email = $1", [normalizedEmail]);
+    const existing = await pool.query(
+      "SELECT id FROM users WHERE email = $1",
+      [normalizedEmail]
+    );
+
     if (existing.rowCount > 0) {
       return res.status(409).json({ message: "Email already exists" });
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
+
     const created = await pool.query(
       `INSERT INTO users (full_name, email, password_hash)
        VALUES ($1, $2, $3)
        RETURNING id, full_name, email, role, created_at`,
-      [String(fullName).trim(), normalizedEmail, passwordHash]
+      [fullName, normalizedEmail, passwordHash]
     );
 
     return res.status(201).json(mapUser(created.rows[0]));
-  } catch (error) {
-    console.error("Registration error", error);
+  } catch (err) {
+    console.error("Register error:", err);
     return res.status(500).json({ message: "Internal server error" });
   }
 });
 
-app.post("/api/auth/login", async (req, res) => {
+// Login
+app.post("/login", async (req, res) => {
   const { email, password } = req.body || {};
 
   if (!email || !password) {
-    return res.status(401).json({ message: "Invalid credentials" });
+    return res.status(400).json({ message: "Invalid credentials" });
   }
 
-  const normalizedEmail = String(email).toLowerCase().trim();
+  const normalizedEmail = email.toLowerCase().trim();
 
   try {
     const result = await pool.query(
-      "SELECT id, full_name, email, role, password_hash, created_at FROM users WHERE email = $1",
+      "SELECT * FROM users WHERE email = $1",
       [normalizedEmail]
     );
 
@@ -105,43 +142,48 @@ app.post("/api/auth/login", async (req, res) => {
     }
 
     const user = result.rows[0];
-    const passwordOk = await bcrypt.compare(password, user.password_hash);
 
-    if (!passwordOk) {
+    const match = await bcrypt.compare(password, user.password_hash);
+
+    if (!match) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    const accessToken = createAccessToken(user);
-    return res.status(200).json({
-      accessToken,
+    const token = createAccessToken(user);
+
+    return res.json({
+      accessToken: token,
       tokenType: "Bearer",
       expiresIn: 3600,
       user: mapUser(user)
     });
-  } catch (error) {
-    console.error("Login error", error);
+  } catch (err) {
+    console.error("Login error:", err);
     return res.status(500).json({ message: "Internal server error" });
   }
 });
 
-app.get("/api/auth/me", authMiddleware, async (req, res) => {
+// Me (protected)
+app.get("/me", authMiddleware, async (req, res) => {
   try {
     const result = await pool.query(
-      "SELECT id, full_name, email, role, created_at FROM users WHERE id = $1",
+      "SELECT * FROM users WHERE id = $1",
       [req.user.sub]
     );
 
     if (result.rowCount === 0) {
-      return res.status(401).json({ message: "Missing or invalid token" });
+      return res.status(404).json({ message: "User not found" });
     }
 
-    return res.status(200).json(mapUser(result.rows[0]));
-  } catch (error) {
-    console.error("Profile error", error);
+    return res.json(mapUser(result.rows[0]));
+  } catch (err) {
+    console.error("Me error:", err);
     return res.status(500).json({ message: "Internal server error" });
   }
 });
 
+/* ---------------- Start ---------------- */
+
 app.listen(port, () => {
-  console.log(`Auth service listening on port ${port}`);
+  console.log(`Auth service running on port ${port}`);
 });
