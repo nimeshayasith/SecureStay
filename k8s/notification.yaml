@@ -31,12 +31,11 @@ spec:
           env:
             - name: PORT
               value: "4004"
-            # FIX: MONGODB_URL was missing — defaulted to localhost:27017 (broken in K8s)
-            - name: MONGODB_URL
+            - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
                   name: securestay-secrets
-                  key: mongodb-url
+                  key: database-url
             - name: RABBITMQ_URL
               valueFrom:
                 secretKeyRef:
